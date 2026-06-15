@@ -1184,6 +1184,13 @@ function newTxn(){
 // ════════════════════════════════════════
 // HISTORY — collapsible
 // ════════════════════════════════════════
+function debugNotes(){
+  // Call this from browser console to see raw notes
+  const sample = allOrders.slice(0,5).map(o=>({id:o.orderId,item:o.itemName,notes:o.notes}));
+  console.log('NOTES DEBUG:', JSON.stringify(sample, null, 2));
+  alert('Check console for notes data. First 5 rows:\n' + sample.map(s=>s.item+': "'+s.notes+'"').join('\n'));
+}
+
 function renderHistorySilent(){
   // Re-render history but preserve which cards are open
   const openCards=new Set();
@@ -1204,13 +1211,27 @@ function renderHistory(){
   [...allOrders].reverse().forEach(o=>{
     if(!groups[o.orderId])groups[o.orderId]={orderId:o.orderId,date:o.date,supplierName:o.supplierName,rows:[],globalNotes:''};
     groups[o.orderId].rows.push(o);
-    // Global note is stored after " | " separator
-    // Only extract if contains " | " — otherwise it's a per-item note only
-    if(o.notes&&o.notes.includes(' | ')){
-      const parts=o.notes.split(' | ');
-      const globalPart=parts[parts.length-1].trim();
-      if(globalPart&&!groups[o.orderId].globalNotes){
-        groups[o.orderId].globalNotes=globalPart;
+  });
+  // After grouping, detect global notes:
+  // If a note appears in " | " suffix of any row, extract it
+  // If ALL rows have identical non-empty notes, that's the global note
+  Object.values(groups).forEach(g=>{
+    const notesWithSep = g.rows.filter(r=>r.notes&&r.notes.includes(' | '));
+    if(notesWithSep.length>0){
+      // Extract suffix after last " | "
+      const parts = notesWithSep[0].notes.split(' | ');
+      g.globalNotes = parts[parts.length-1].trim();
+    } else {
+      // Check if ALL rows have identical notes (= global note applied to all)
+      const nonEmpty = g.rows.filter(r=>r.notes&&r.notes.trim());
+      if(nonEmpty.length===g.rows.length&&g.rows.length>1){
+        const first = nonEmpty[0].notes.trim();
+        if(nonEmpty.every(r=>r.notes.trim()===first)){
+          g.globalNotes = first;
+        }
+      } else if(nonEmpty.length>0&&nonEmpty.length===g.rows.length){
+        // Single item order with notes — treat as per-item
+        g.globalNotes='';
       }
     }
   });
@@ -1245,7 +1266,18 @@ function renderHistory(){
                 <span class="hcard-isub">${r.price>0?'₱'+(r.price*r.qty).toFixed(2):''}</span>
               </div>
             </div>
-            ${(()=>{const n=r.notes||'';const itemNote=n.includes(' | ')?n.split(' | ')[0]:n;return itemNote?`<div style="font-size:11px;color:var(--ink3);font-style:italic;padding-left:2px;">📝 ${itemNote}</div>`:''})()}
+            ${(()=>{
+              const rawNote=(r.notes||'').trim();
+              if(!rawNote)return '';
+              // Extract per-item part (before " | ")
+              const itemPart=rawNote.includes(' | ')?rawNote.split(' | ')[0].trim():rawNote;
+              if(!itemPart)return '';
+              // If this same note exists in ALL rows = it's global, skip showing per-item
+              const totalRows=g.rows.length;
+              const sameCount=g.rows.filter(x=>(x.notes||'').trim()===rawNote||(x.notes||'').trim()===itemPart).length;
+              if(sameCount===totalRows&&totalRows>1)return '';
+              return `<div style="font-size:11px;color:var(--ink3);font-style:italic;padding-left:2px;">📝 ${itemPart}</div>`;
+            })()}
           </div>`).join('')}
           ${g.globalNotes?`<div style="padding:8px 14px;font-size:12px;color:var(--ink3);font-style:italic;background:var(--warnbg);border-top:1px solid var(--line);">📝 Notes: ${g.globalNotes}</div>`:''}
           <div class="hcard-total-row">
