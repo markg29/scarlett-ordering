@@ -425,6 +425,13 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--surface);color:
 .spin.w{border-color:rgba(255,255,255,.3);border-top-color:#fff;}
 @keyframes rot{to{transform:rotate(360deg);}}
 
+/* ── SAVE SUCCESS BANNER ── */
+#save-success-banner.show{
+  opacity:1 !important;
+  transform:translate(-50%,-50%) scale(1) !important;
+  pointer-events:none;
+}
+
 /* ── TOAST ── */
 #toast{
   position:fixed;bottom:calc(var(--TAB)+12px);
@@ -734,7 +741,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--surface);color:
   position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(.8);
   background:var(--ok);color:#fff;
   border-radius:20px;padding:24px 32px;
-  text-align:center;z-index:9999;
+  text-align:center;z-index:10000;
   opacity:0;pointer-events:none;
   transition:all .25s cubic-bezier(.34,1.56,.64,1);
   box-shadow:0 8px 32px rgba(5,150,105,.4);
@@ -743,12 +750,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--surface);color:
   <div style="font-size:48px;margin-bottom:8px;">✅</div>
   <div class="ssb-msg" style="font-size:16px;font-weight:700;">Na-save na!</div>
 </div>
-<style>
-#save-success-banner.show{
-  opacity:1;
-  transform:translate(-50%,-50%) scale(1);
-}
-</style>
+
 
 <script>
 // ════════════════════════════════════════
@@ -1182,11 +1184,35 @@ function newTxn(){
 // ════════════════════════════════════════
 // HISTORY — collapsible
 // ════════════════════════════════════════
+function renderHistorySilent(){
+  // Re-render history but preserve which cards are open
+  const openCards=new Set();
+  document.querySelectorAll('.hcard.open').forEach(el=>{
+    openCards.add(el.dataset.orderId);
+  });
+  renderHistory();
+  // Re-open cards that were open
+  document.querySelectorAll('.hcard').forEach(el=>{
+    if(openCards.has(el.dataset.orderId)){
+      el.classList.add('open');
+    }
+  });
+}
+
 function renderHistory(){
   const groups={};
   [...allOrders].reverse().forEach(o=>{
-    if(!groups[o.orderId])groups[o.orderId]={orderId:o.orderId,date:o.date,supplierName:o.supplierName,rows:[]};
+    if(!groups[o.orderId])groups[o.orderId]={orderId:o.orderId,date:o.date,supplierName:o.supplierName,rows:[],globalNotes:''};
     groups[o.orderId].rows.push(o);
+    // Global note is stored after " | " separator
+    // Only extract if contains " | " — otherwise it's a per-item note only
+    if(o.notes&&o.notes.includes(' | ')){
+      const parts=o.notes.split(' | ');
+      const globalPart=parts[parts.length-1].trim();
+      if(globalPart&&!groups[o.orderId].globalNotes){
+        groups[o.orderId].globalNotes=globalPart;
+      }
+    }
   });
   const list=Object.values(groups);
   if(!list.length){
@@ -1197,7 +1223,7 @@ function renderHistory(){
     '<div style="padding-top:4px;">'+
     list.map((g,gi)=>{
       const total=g.rows.reduce((s,r)=>s+r.price*r.qty,0);
-      return `<div class="hcard" id="hc-${gi}">
+      return `<div class="hcard" id="hc-${gi}" data-order-id="${g.orderId}">
         <div class="hcard-header" onclick="toggleHCard(${gi})">
           <div class="hcard-left">
             <div class="hcard-id">${g.orderId}</div>
@@ -1211,17 +1237,23 @@ function renderHistory(){
           <div class="hcard-chevron">›</div>
         </div>
         <div class="hcard-body">
-          ${g.rows.map(r=>`<div class="hcard-item">
-            <span class="hcard-iname">${r.itemName}</span>
-            <span class="hcard-iqty">${r.qty} ${r.unit}</span>
-            <span class="hcard-isub">₱${(r.price*r.qty).toFixed(2)}</span>
+          ${g.rows.map(r=>`<div class="hcard-item" style="flex-direction:column;align-items:flex-start;gap:2px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;width:100%;">
+              <span class="hcard-iname">${r.itemName}</span>
+              <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+                <span class="hcard-iqty">${r.qty} ${r.unit}</span>
+                <span class="hcard-isub">${r.price>0?'₱'+(r.price*r.qty).toFixed(2):''}</span>
+              </div>
+            </div>
+            ${(()=>{const n=r.notes||'';const itemNote=n.includes(' | ')?n.split(' | ')[0]:n;return itemNote?`<div style="font-size:11px;color:var(--ink3);font-style:italic;padding-left:2px;">📝 ${itemNote}</div>`:''})()}
           </div>`).join('')}
+          ${g.globalNotes?`<div style="padding:8px 14px;font-size:12px;color:var(--ink3);font-style:italic;background:var(--warnbg);border-top:1px solid var(--line);">📝 Notes: ${g.globalNotes}</div>`:''}
           <div class="hcard-total-row">
             <span class="hcard-total-label">Kabuuan</span>
-            <div style="display:flex;align-items:center;gap:10px;">
-              <button class="hcard-print-btn" onclick="printHistoryOrder('${g.orderId}')">🖨️ I-print</button>
-              <button class="hcard-print-btn" style="background:var(--brandbg);color:var(--brand);" onclick="openEditOrder('${g.orderId}')">✏️ I-edit</button>
-              <button class="hcard-print-btn" style="background:var(--dangerbg);color:var(--danger);" onclick="askDeleteOrder('${g.orderId}')">🗑 Burahin</button>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <button class="hcard-print-btn" onclick="printHistoryOrder('${g.orderId}')">🖨️</button>
+              <button class="hcard-print-btn" style="background:var(--brandbg);color:var(--brand);" onclick="openEditOrder('${g.orderId}')">✏️</button>
+              <button class="hcard-print-btn" style="background:var(--dangerbg);color:var(--danger);" onclick="askDeleteOrder('${g.orderId}')">🗑️</button>
               <span class="hcard-total-val">₱${total.toFixed(2)}</span>
             </div>
           </div>
@@ -1779,7 +1811,7 @@ async function silentRefresh(){
     allItems=(d.items||[]).map(r=>({id:String(r[0]||''),supplierId:String(r[1]||''),name:String(r[2]||''),unit:String(r[3]||''),price:parseFloat(r[4])||0,maxOrder:r[5]!==''&&r[5]!==null&&r[5]!==undefined?parseInt(r[5])||0:0,imageUrl:String(r[6]||'')})).filter(i=>i.id&&i.name);
     allOrders=(d.orders||[]).map(r=>({orderId:String(r[0]||''),date:fmtDate(r[1]),supplierId:String(r[2]||''),supplierName:String(r[3]||''),itemId:String(r[4]||''),itemName:String(r[5]||''),qty:parseFloat(r[6])||0,unit:String(r[7]||''),price:parseFloat(r[8])||0,notes:String(r[9]||'')})).filter(o=>o.orderId);
     if(curPage==='home')renderHome();
-    else if(curPage==='history')renderHistory();
+    else if(curPage==='history')renderHistorySilent(); // preserve open cards
     else if(curPage==='items')renderItems();
   }catch(e){}
 }
