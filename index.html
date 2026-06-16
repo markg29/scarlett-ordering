@@ -1778,7 +1778,19 @@ const TMAP={home:'tb-home',items:'tb-items',history:'tb-history',settings:'tb-se
 let curPage='home';
 
 function goTab(name){
-  if(name==='items'&&!activeSup){toast('Pumili muna ng supplier sa Home 👆','err');return;}
+  if(name==='items'&&!activeSup){
+    toast('👆 Pumili muna ng supplier','err');
+    // Redirect to home so user can pick supplier
+    goPage('home');
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+    document.getElementById('tb-home')?.classList.add('on');
+    // Pulse the supplier section to guide user
+    setTimeout(()=>{
+      const supRow=document.getElementById('sup-scroll');
+      if(supRow){supRow.style.transition='box-shadow .3s';supRow.style.boxShadow='0 0 0 3px var(--brand)';setTimeout(()=>supRow.style.boxShadow='',1000);}
+    },300);
+    return;
+  }
   if(name==='history')renderHistory();
   // Hide float bar when leaving items tab, show when on items tab
   if(name!=='items'){document.getElementById('float-bar').classList.add('hide');}
