@@ -61,15 +61,22 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--surface);color:
 /* ── PAGES ── */
 /* padding-top = NAV + extra gap; padding-bottom = TAB + extra gap */
 .page{
-  display:none;
   position:fixed;
   top:0;left:0;right:0;bottom:0;
   overflow-y:auto;
   -webkit-overflow-scrolling:touch;
   padding-top:calc(var(--NAV) + 16px);
   padding-bottom:calc(var(--TAB) + 20px);
+  /* Hidden by default - pointer-events off so hidden pages dont intercept taps */
+  opacity:0;
+  pointer-events:none;
+  z-index:1;
 }
-.page.on{display:block;}
+.page.on{
+  opacity:1;
+  pointer-events:all;
+  z-index:2;
+}
 
 /* ── HERO ── */
 .hero{
@@ -887,7 +894,6 @@ function pickSupplier(id,name){
   activeSup={id,name};
   cart=[];
   // Reset items scroll when switching supplier
-  scrollPos['items']=0;
   const itemsEl=document.getElementById('pg-items');
   if(itemsEl)itemsEl.scrollTop=0;
   renderHome();
@@ -1185,7 +1191,6 @@ function newTxn(){
   document.getElementById('global-notes').value='';
   document.getElementById('float-bar').classList.add('hide');
   // Reset scroll for home when starting fresh
-  scrollPos['home']=0;
   const homeEl=document.getElementById('pg-home');
   if(homeEl)homeEl.scrollTop=0;
   renderHome();goTab('home');
@@ -1807,28 +1812,10 @@ function goTab(name){
   else if(cart.length>0){document.getElementById('float-bar').classList.remove('hide');}
   goPage(name);
 }
-// Save/restore scroll positions per page
-const scrollPos={};
-
 function goPage(name){
-  // Save scroll of CURRENT page element before hiding it
-  if(curPage){
-    const curEl=document.getElementById('pg-'+curPage);
-    if(curEl) scrollPos[curPage]=curEl.scrollTop;
-  }
-
-  // Hide all pages
-  document.querySelectorAll('.page').forEach(p=>{
-    p.classList.remove('on');
-    p.style.overflowY='';
-  });
-
-  // Show new page
-  const newEl=document.getElementById('pg-'+name);
-  if(newEl){
-    newEl.classList.add('on');
-    // CSS handles layout
-  }
+  // Pages use opacity to hide/show - scroll position is naturally preserved
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  document.getElementById('pg-'+name)?.classList.add('on');
 
   const c=PCFG[name]||{title:'',sub:'',back:false,tabs:true};
   document.getElementById('nav-title').textContent=c.title;
@@ -1839,10 +1826,6 @@ function goPage(name){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
   if(TMAP[name])document.getElementById(TMAP[name])?.classList.add('on');
   curPage=name;
-
-  // Restore scroll
-  const saved=scrollPos[name]||0;
-  if(newEl) requestAnimationFrame(()=>{ newEl.scrollTop=saved; });
 }
 function goBack(){
   const p={items:'home',review:'items',success:'home'}[curPage]||'home';
