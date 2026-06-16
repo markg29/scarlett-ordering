@@ -741,7 +741,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--surface);color:
     </div>
     <div class="modal-btns" style="margin-top:20px;">
       <button class="m-cancel" onclick="closeOverlay('mo-confirm')">Hindi</button>
-      <button class="m-save" id="confirm-btn" style="background:var(--danger);" onclick="runDelete()">I-delete</button>
+      <button class="m-save" id="confirm-btn" style="background:var(--danger);">I-delete</button>
     </div>
   </div>
 </div>
@@ -1374,13 +1374,15 @@ function askDeleteOrder(orderId){
     toast('Nag-de-delete...','');
     try{
       await apiPost({action:'deleteOrder',orderId});
-      // Remove from local state
       allOrders=allOrders.filter(o=>o.orderId!==orderId);
       renderHistory();
       renderHome();
       showSaveSuccess('Order na-delete!');
     }catch(e){toast('❌ '+e.message,'err');}
   };
+  const cBtn=document.getElementById('confirm-btn');
+  cBtn.textContent='I-delete';
+  cBtn.onclick=runDelete;
   openOverlay('mo-confirm');
 }
 
@@ -1642,6 +1644,9 @@ function askDel(type,id,name){
       showSaveSuccess(name+' na-delete!');
     }catch(e){toast('❌ '+e.message,'err');}
   };
+  const cBtn=document.getElementById('confirm-btn');
+  cBtn.textContent='I-delete';
+  cBtn.onclick=runDelete;
   openOverlay('mo-confirm');
 }
 function runDelete(){if(pendingDelete){pendingDelete();pendingDelete=null;}}
