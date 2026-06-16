@@ -909,6 +909,15 @@ function pickSupplier(id,name){
 // ════════════════════════════════════════
 // ITEMS
 // ════════════════════════════════════════
+function renderItemsSilent(){
+  // Save scroll position before re-render
+  const pg=document.getElementById('pg-items');
+  const saved=pg?pg.scrollTop:0;
+  renderItems();
+  // Restore after render
+  if(pg) requestAnimationFrame(()=>pg.scrollTop=saved);
+}
+
 function renderItems(){
   if(!activeSup){
     document.getElementById('items-wrap').innerHTML=`<div class="empty"><div class="empty-ic">👆</div><div class="empty-h">Walang supplier</div><div class="empty-b">Pumili muna ng supplier sa Home.</div></div>`;
@@ -1832,7 +1841,13 @@ function goPage(name){
 }
 function goBack(){
   const p={items:'home',review:'items',success:'home'}[curPage]||'home';
-  if(p==='items')renderItems();
+  if(p==='items'){
+    // Going back from review - save items scroll, render, restore
+    const pg=document.getElementById('pg-items');
+    const saved=pg?pg.scrollTop:0;
+    renderItems();
+    if(pg) requestAnimationFrame(()=>pg.scrollTop=saved);
+  }
   goPage(p);
   if(p!=='items')document.getElementById('float-bar').classList.add('hide');
 }
@@ -1875,7 +1890,7 @@ async function silentRefresh(){
     allOrders=(d.orders||[]).map(r=>({orderId:String(r[0]||''),date:fmtDate(r[1]),supplierId:String(r[2]||''),supplierName:String(r[3]||''),itemId:String(r[4]||''),itemName:String(r[5]||''),qty:parseFloat(r[6])||0,unit:String(r[7]||''),price:parseFloat(r[8])||0,notes:String(r[9]||'')})).filter(o=>o.orderId);
     if(curPage==='home')renderHome();
     else if(curPage==='history')renderHistorySilent(); // preserve open cards
-    else if(curPage==='items')renderItems();
+    else if(curPage==='items')renderItemsSilent();
   }catch(e){}
 }
 // Refresh every 30 seconds silently
