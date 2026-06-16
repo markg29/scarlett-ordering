@@ -848,11 +848,15 @@ function renderHome(){
   sortedSuppliers.forEach((s,i)=>{
     const cnt=allItems.filter(it=>it.supplierId===s.id).length;
     const sel=activeSup&&activeSup.id===s.id;
+    const cartIndicator = (sel && cart.length>0)
+      ? `<span style="position:absolute;top:-6px;right:-6px;background:var(--warn);color:#fff;border-radius:999px;min-width:20px;height:20px;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;padding:0 5px;border:2px solid var(--white);z-index:3;">${cart.length}</span>`
+      : '';
     const emoji = EM[i%EM.length];
     const logoHtml = s.logo
       ? `<img src="${s.logo}" style="width:28px;height:28px;border-radius:6px;object-fit:cover;flex-shrink:0;" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"/><span style="display:none;font-size:24px;">${emoji}</span>`
       : `<span style="font-size:24px;">${emoji}</span>`;
     html+=`<div class="sup-chip${sel?' sel':''}" onclick="pickSupplier('${E(s.id)}','${E(s.name)}')">
+      ${cartIndicator}
       <button class="sc-del" onclick="event.stopPropagation();askDel('sup','${E(s.id)}','${E(s.name)}')">✕</button>
       <button style="position:absolute;top:8px;left:8px;width:20px;height:20px;border-radius:50%;background:var(--brandbg);color:var(--brand);border:2px solid var(--white);font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s;" class="sc-edit-btn" onclick="event.stopPropagation();openEditSupplier('${E(s.id)}')">✎</button>
       <div class="sc-em">${logoHtml}</div>
@@ -893,10 +897,44 @@ function renderHome(){
 // ════════════════════════════════════════
 // PICK SUPPLIER
 // ════════════════════════════════════════
+let pendingSupplierSwitch=null;
+
 function pickSupplier(id,name){
+  // Same supplier tapped again - just navigate, keep cart
+  if(activeSup && activeSup.id===id){
+    goPage('items');
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+    document.getElementById('tb-items')?.classList.add('on');
+    return;
+  }
+  // If switching to a DIFFERENT supplier while cart has unsaved items, warn first
+  if(cart.length>0){
+    pendingSupplierSwitch={id,name};
+    const itemCount=cart.length;
+    document.getElementById('confirm-h').textContent='May items pa sa cart!';
+    document.getElementById('confirm-s').textContent=`May ${itemCount} item${itemCount!==1?'s':''} pa sa kasalukuyang order na hindi pa na-save. Kung lilipat ka ng supplier, mawawala ang mga ito. Sigurado ka ba?`;
+    document.getElementById('confirm-btn').textContent='Oo, lipat na';
+    document.getElementById('confirm-btn').onclick=confirmSupplierSwitch;
+    openOverlay('mo-confirm');
+    return;
+  }
+  doSwitchSupplier(id,name);
+}
+
+function confirmSupplierSwitch(){
+  closeOverlay('mo-confirm');
+  if(pendingSupplierSwitch){
+    doSwitchSupplier(pendingSupplierSwitch.id,pendingSupplierSwitch.name);
+    pendingSupplierSwitch=null;
+  }
+  // Reset confirm button back to default delete behavior
+  document.getElementById('confirm-btn').textContent='I-delete';
+  document.getElementById('confirm-btn').onclick=runDelete;
+}
+
+function doSwitchSupplier(id,name){
   activeSup={id,name};
   cart=[];
-  // Reset items scroll when switching supplier
   const itemsEl=document.getElementById('pg-items');
   if(itemsEl)itemsEl.scrollTop=0;
   renderHome();
