@@ -883,6 +883,8 @@ function renderHome(){
 function pickSupplier(id,name){
   activeSup={id,name};
   cart=[];
+  // Reset items scroll when switching supplier
+  scrollPos['items']=0;
   renderHome();
   renderItems();
   goPage('items');
@@ -1177,6 +1179,8 @@ function newTxn(){
   cart=[];lastOrder=null;activeSup=null;
   document.getElementById('global-notes').value='';
   document.getElementById('float-bar').classList.add('hide');
+  // Reset scroll for home when starting fresh
+  scrollPos['home']=0;
   renderHome();goTab('home');
 }
 
@@ -1796,7 +1800,13 @@ function goTab(name){
   else if(cart.length>0){document.getElementById('float-bar').classList.remove('hide');}
   goPage(name);
 }
+// Save/restore scroll positions per page
+const scrollPos={};
+
 function goPage(name){
+  // Save current scroll before leaving
+  if(curPage) scrollPos[curPage]=window.scrollY;
+
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   document.getElementById('pg-'+name)?.classList.add('on');
   const c=PCFG[name]||{title:'',sub:'',back:false,tabs:true};
@@ -1808,7 +1818,10 @@ function goPage(name){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
   if(TMAP[name])document.getElementById(TMAP[name])?.classList.add('on');
   curPage=name;
-  window.scrollTo(0,0);
+
+  // Restore scroll position for this page, or go to top for new pages
+  const savedScroll=scrollPos[name]??0;
+  requestAnimationFrame(()=>window.scrollTo(0,savedScroll));
 }
 function goBack(){
   const p={items:'home',review:'items',success:'home'}[curPage]||'home';
