@@ -23,7 +23,7 @@
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 html,body{height:100%;overscroll-behavior:none;}
-body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--surface);color:var(--ink);max-width:430px;margin:0 auto;overflow-x:hidden;}
+body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--surface);color:var(--ink);max-width:430px;margin:0 auto;overflow:hidden;height:100%;}
 
 /* ── NAV ── */
 #nav{
@@ -62,15 +62,18 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--surface);color:
 /* padding-top = NAV + extra gap; padding-bottom = TAB + extra gap */
 .page{
   position:fixed;
-  top:0;left:0;right:0;bottom:0;
+  top:0;left:50%;transform:translateX(-50%);
+  width:100%;max-width:430px;
+  bottom:0;
   overflow-y:auto;
   -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;
   padding-top:calc(var(--NAV) + 16px);
   padding-bottom:calc(var(--TAB) + 20px);
-  /* Hidden by default - pointer-events off so hidden pages dont intercept taps */
   opacity:0;
   pointer-events:none;
   z-index:1;
+  background:var(--surface);
 }
 .page.on{
   opacity:1;
