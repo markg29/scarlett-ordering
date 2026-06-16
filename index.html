@@ -62,9 +62,12 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--surface);color:
 /* padding-top = NAV + extra gap; padding-bottom = TAB + extra gap */
 .page{
   display:none;
+  position:fixed;
+  top:0;left:0;right:0;bottom:0;
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
   padding-top:calc(var(--NAV) + 16px);
   padding-bottom:calc(var(--TAB) + 20px);
-  min-height:100vh;
 }
 .page.on{display:block;}
 
@@ -885,6 +888,8 @@ function pickSupplier(id,name){
   cart=[];
   // Reset items scroll when switching supplier
   scrollPos['items']=0;
+  const itemsEl=document.getElementById('pg-items');
+  if(itemsEl)itemsEl.scrollTop=0;
   renderHome();
   renderItems();
   goPage('items');
@@ -1181,6 +1186,8 @@ function newTxn(){
   document.getElementById('float-bar').classList.add('hide');
   // Reset scroll for home when starting fresh
   scrollPos['home']=0;
+  const homeEl=document.getElementById('pg-home');
+  if(homeEl)homeEl.scrollTop=0;
   renderHome();goTab('home');
 }
 
@@ -1804,11 +1811,25 @@ function goTab(name){
 const scrollPos={};
 
 function goPage(name){
-  // Save current scroll before leaving
-  if(curPage) scrollPos[curPage]=window.scrollY;
+  // Save scroll of CURRENT page element before hiding it
+  if(curPage){
+    const curEl=document.getElementById('pg-'+curPage);
+    if(curEl) scrollPos[curPage]=curEl.scrollTop;
+  }
 
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
-  document.getElementById('pg-'+name)?.classList.add('on');
+  // Hide all pages
+  document.querySelectorAll('.page').forEach(p=>{
+    p.classList.remove('on');
+    p.style.overflowY='';
+  });
+
+  // Show new page
+  const newEl=document.getElementById('pg-'+name);
+  if(newEl){
+    newEl.classList.add('on');
+    // CSS handles layout
+  }
+
   const c=PCFG[name]||{title:'',sub:'',back:false,tabs:true};
   document.getElementById('nav-title').textContent=c.title;
   document.getElementById('nav-sub').textContent=c.sub;
@@ -1819,9 +1840,9 @@ function goPage(name){
   if(TMAP[name])document.getElementById(TMAP[name])?.classList.add('on');
   curPage=name;
 
-  // Restore scroll position for this page, or go to top for new pages
-  const savedScroll=scrollPos[name]??0;
-  requestAnimationFrame(()=>window.scrollTo(0,savedScroll));
+  // Restore scroll
+  const saved=scrollPos[name]||0;
+  if(newEl) requestAnimationFrame(()=>{ newEl.scrollTop=saved; });
 }
 function goBack(){
   const p={items:'home',review:'items',success:'home'}[curPage]||'home';
