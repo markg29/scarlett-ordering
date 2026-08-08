@@ -618,7 +618,6 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--surface);color:
       <select class="f-inp" id="mi-unit" style="appearance:auto;">
         <option value="">Piliin...</option>
         <option value="PCS">PCS</option>
-        <option value="PACK">PACK</option>
         <option value="CASE">CASE</option>
         <option value="BUNDLE">BUNDLE</option>
         <option value="DOZEN">DOZEN</option>
@@ -628,6 +627,8 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--surface);color:
     </div>
     <div class="f-lbl">Max Order <span style="font-weight:400;text-transform:none;color:var(--ink3);font-size:11px;">(iwanan blank kung walang limit)</span></div>
     <input class="f-inp" id="mi-max" type="number" placeholder="Hal: 10" inputmode="numeric" min="1"/>
+    <div class="f-lbl">Category <span style="font-weight:400;text-transform:none;color:var(--ink3);font-size:11px;">(opsyonal)</span></div>
+    <input class="f-inp" id="mi-category" placeholder="Hal: Beverages, Canned Goods, Snacks..."/>
     <div class="f-lbl">Auto ID</div>
     <input class="f-inp ro" id="mi-id" readonly/>
     <div class="f-hint">Awtomatikong nalilikha</div>
@@ -680,7 +681,6 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--surface);color:
           <option value="PCS">PCS</option>
           <option value="CASE">CASE</option>
           <option value="BUNDLE">BUNDLE</option>
-          <option value="PACK">PACK</option>
           <option value="DOZEN">DOZEN</option>
           <option value="TIE">TIE</option>
         </select>
@@ -692,6 +692,8 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--surface);color:
     </div>
     <div class="f-lbl">Max Order <span style="font-weight:400;text-transform:none;color:var(--ink3);font-size:11px;">(blank = walang limit)</span></div>
     <input class="f-inp" id="ei-max" type="number" placeholder="Hal: 10" inputmode="numeric" min="1"/>
+    <div class="f-lbl">Category <span style="font-weight:400;text-transform:none;color:var(--ink3);font-size:11px;">(opsyonal)</span></div>
+    <input class="f-inp" id="ei-category" placeholder="Hal: Beverages, Canned Goods, Snacks..."/>
     <div class="f-lbl">Larawan ng Produkto (opsyonal)</div>
     <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:13px;">
       <div style="flex:1;">
@@ -832,7 +834,7 @@ async function loadAll(){
       apiGet({action:'getInventory'}).catch(()=>({goods:[]})) // soft-fail if Scarlett sheets not set up yet
     ]);
     suppliers=(d.suppliers||[]).map(r=>({id:String(r[0]||''),name:String(r[1]||''),logo:String(r[2]||'')})).filter(s=>s.id&&s.name);
-    allItems=(d.items||[]).map(r=>({id:String(r[0]||''),supplierId:String(r[1]||''),name:String(r[2]||''),unit:String(r[3]||''),price:parseFloat(r[4])||0,maxOrder:r[5]!==''&&r[5]!==null&&r[5]!==undefined?parseInt(r[5])||0:0,imageUrl:String(r[6]||'')})).filter(i=>i.id&&i.name);
+    allItems=(d.items||[]).map(r=>({id:String(r[0]||''),supplierId:String(r[1]||''),name:String(r[2]||''),unit:String(r[3]||''),price:parseFloat(r[4])||0,maxOrder:r[5]!==''&&r[5]!==null&&r[5]!==undefined?parseInt(r[5])||0:0,imageUrl:String(r[6]||''),category:String(r[7]||'')})).filter(i=>i.id&&i.name);
     allOrders=(d.orders||[]).map(r=>({orderId:String(r[0]||''),date:fmtDate(r[1]),supplierId:String(r[2]||''),supplierName:String(r[3]||''),itemId:String(r[4]||''),itemName:String(r[5]||''),qty:parseFloat(r[6])||0,unit:String(r[7]||''),price:parseFloat(r[8])||0,notes:String(r[9]||'')})).filter(o=>o.orderId);
     inventoryGoods=(dInv.goods||[]).map(r=>({id:String(r[0]||''),name:String(r[1]||''),quantity:parseFloat(r[4])||0,minStockQty:parseFloat(r[5])||0})).filter(g=>g.id&&g.name);
     renderHome();
@@ -985,28 +987,41 @@ function renderItems(){
   if(!myItems.length){
     document.getElementById('items-wrap').innerHTML=`<div class="empty"><div class="empty-ic">📦</div><div class="empty-h">Walang items pa</div><div class="empty-b">I-tap ang "Magdagdag ng Item" sa baba.</div></div>`;
   }else{
-    document.getElementById('items-wrap').innerHTML=
-      '<div class="items-list">'+
-      myItems.map(item=>{
-        const inCart=cart.find(c=>c.itemId===item.id);
-        const qty=inCart?inCart.qty:0;
-        const hasMax = item.maxOrder > 0;
-        const maxAttr = hasMax ? `max="${item.maxOrder}"` : '';
-        const maxBadge = hasMax
-          ? `<span style="background:var(--warnbg);color:var(--warn);border-radius:999px;padding:2px 7px;font-size:10px;font-weight:700;">MAX ${item.maxOrder}</span>`
-          : '';
-        const cartBadge = inCart
-          ? `<span id="cbadge-${item.id}" style="background:var(--ok);color:#fff;border-radius:999px;padding:2px 8px;font-size:10px;font-weight:700;display:inline-flex;align-items:center;gap:3px;">✓ ${inCart.qty} sa cart</span>`
-          : `<span id="cbadge-${item.id}" style="display:none"></span>`;
-        const priceTag = item.price > 0
-          ? `<span class="ir-price">₱${item.price.toFixed(2)}</span>`
-          : '';
-        const stockInfo = findStockByName(item.name);
-        const stockBadge = stockInfo
-          ? `<span style="background:${stockInfo.minStockQty>0&&stockInfo.quantity<=stockInfo.minStockQty?'var(--dangerbg)':'var(--surface)'};color:${stockInfo.minStockQty>0&&stockInfo.quantity<=stockInfo.minStockQty?'var(--danger)':'var(--ink2)'};border-radius:999px;padding:2px 7px;font-size:10px;font-weight:700;">📦 Stock: ${stockInfo.quantity}</span>`
-          : '';
-        return `<div class="item-row${inCart?' in-cart':''}" id="irow-${item.id}">
-          ${item.imageUrl?`<img src="${item.imageUrl}" style="width:42px;height:42px;border-radius:10px;object-fit:cover;flex-shrink:0;" onerror="this.style.display='none'"/>`:''}
+    // Group items by category
+    const grouped={};
+    myItems.forEach(item=>{
+      const cat=item.category&&item.category.trim()?item.category.trim():'Iba pa';
+      if(!grouped[cat])grouped[cat]=[];
+      grouped[cat].push(item);
+    });
+    // Sort categories: alphabetical, but "Iba pa" always last
+    const cats=Object.keys(grouped).sort((a,b)=>{
+      if(a==='Iba pa')return 1;
+      if(b==='Iba pa')return -1;
+      return a.localeCompare(b);
+    });
+
+    const renderItem=(item)=>{
+      const inCart=cart.find(c=>c.itemId===item.id);
+      const qty=inCart?inCart.qty:0;
+      const hasMax = item.maxOrder > 0;
+      const maxAttr = hasMax ? `max="${item.maxOrder}"` : '';
+      const maxBadge = hasMax
+        ? `<span style="background:var(--warnbg);color:var(--warn);border-radius:999px;padding:2px 7px;font-size:10px;font-weight:700;">MAX ${item.maxOrder}</span>`
+        : '';
+      const cartBadge = inCart
+        ? `<span id="cbadge-${item.id}" style="background:var(--ok);color:#fff;border-radius:999px;padding:2px 8px;font-size:10px;font-weight:700;display:inline-flex;align-items:center;gap:3px;">✓ ${inCart.qty} sa cart</span>`
+        : `<span id="cbadge-${item.id}" style="display:none"></span>`;
+      const priceTag = item.price > 0
+        ? `<span class="ir-price">₱${item.price.toFixed(2)}</span>`
+        : '';
+      const stockInfo = findStockByName(item.name);
+      const stockBadge = stockInfo
+        ? `<span style="background:${stockInfo.minStockQty>0&&stockInfo.quantity<=stockInfo.minStockQty?'var(--dangerbg)':'var(--surface)'};color:${stockInfo.minStockQty>0&&stockInfo.quantity<=stockInfo.minStockQty?'var(--danger)':'var(--ink2)'};border-radius:999px;padding:2px 7px;font-size:10px;font-weight:700;">📦 Stock: ${stockInfo.quantity}</span>`
+        : '';
+      return `<div class="item-row${inCart?' in-cart':''}" id="irow-${item.id}">
+          ${item.imageUrl?`<img src="${item.imageUrl}" style="width:42px;height:42px;border-radius:10px;object-fit:cover;flex-shrink:0;" onerror="this.style.display='none'"/>`:''
+}
           <div class="ir-left">
             <div class="ir-name">${item.name}${item.unit?' <span style="font-weight:700;color:var(--brand);font-size:11px;background:var(--brandbg);padding:1px 6px;border-radius:4px;margin-left:4px;">'+item.unit+'</span>':''}</div>
             <div class="ir-sub">
@@ -1027,8 +1042,19 @@ function renderItems(){
             <button class="edit-btn" onclick="openEditItem('${item.id}')">✎</button>
           </div>
         </div>`;
-      }).join('')+
-      '</div>';
+    };
+
+    document.getElementById('items-wrap').innerHTML=
+      cats.map(cat=>`
+        <div style="padding:10px 14px 4px;display:flex;align-items:center;gap:8px;">
+          <div style="font-size:11px;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.6px;">${cat}</div>
+          <div style="flex:1;height:1px;background:var(--line);"></div>
+          <div style="font-size:11px;color:var(--ink3);font-weight:600;">${grouped[cat].length}</div>
+        </div>
+        <div class="items-list">
+          ${grouped[cat].map(renderItem).join('')}
+        </div>`
+      ).join('');
   }
   refreshFloat();
 }
@@ -1568,6 +1594,7 @@ function openEditItem(itemId){
   document.getElementById('ei-unit').value=item.unit||'';
   document.getElementById('ei-price').value=item.price||'';
   document.getElementById('ei-max').value=item.maxOrder>0?item.maxOrder:'';
+  document.getElementById('ei-category').value=item.category||'';
   document.getElementById('ei-img-url').value=item.imageUrl||'';
   document.getElementById('ei-img-file').value='';
   const prev=document.getElementById('ei-img-preview');
@@ -1583,16 +1610,15 @@ async function saveEditItem(){
   const unit=document.getElementById('ei-unit').value;
   const price=parseFloat(document.getElementById('ei-price').value)||0;
   const maxOrder=parseInt(document.getElementById('ei-max').value)||0;
+  const category=document.getElementById('ei-category').value.trim();
   if(!name){toast('Lagyan ng pangalan!','err');return;}
   const btn=document.getElementById('ei-btn');
   btn.textContent='Nag-se-save...';btn.disabled=true;
   try{
     const imageUrl=await getImageData('ei-img-url','ei-img-file');
-    await apiPost({action:'editItem',id,name,unit,price,maxOrder,imageUrl});
-    // Update local state
+    await apiPost({action:'editItem',id,name,unit,price,maxOrder,imageUrl,category});
     const idx=allItems.findIndex(i=>i.id===id);
-    if(idx>=0)allItems[idx]={...allItems[idx],name,unit,price,maxOrder,imageUrl};
-    // Update cart if this item is in it
+    if(idx>=0)allItems[idx]={...allItems[idx],name,unit,price,maxOrder,imageUrl,category};
     const ci=cart.findIndex(c=>c.itemId===id);
     if(ci>=0)cart[ci]={...cart[ci],name,unit,price};
     closeOverlay('mo-edit-item');
@@ -1608,7 +1634,7 @@ async function saveEditItem(){
 function openAddItem(){
   if(!activeSup){toast('Pumili muna ng supplier','err');return;}
   document.getElementById('mo-item-title').textContent=`📦 Bagong Item — ${activeSup.name}`;
-  ['mi-name','mi-price','mi-max'].forEach(id=>document.getElementById(id).value='');
+  ['mi-name','mi-price','mi-max','mi-category'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('mi-unit').value='';
   document.getElementById('mi-id').value=genItemId();
   openOverlay('mo-item');
@@ -1619,13 +1645,14 @@ async function saveItem(){
   const unit=document.getElementById('mi-unit').value.trim();
   const price=parseFloat(document.getElementById('mi-price').value)||0;
   const id=document.getElementById('mi-id').value.trim();
+  const category=document.getElementById('mi-category').value.trim();
   if(!name){toast('Lagyan ng pangalan ng item!','err');return;}
   const btn=document.getElementById('mi-btn');
   btn.textContent='Nag-se-save...';btn.disabled=true;
   try{
     const maxOrder=parseInt(document.getElementById('mi-max').value)||0;
-    await apiPost({action:'addItem',id,supplierId:activeSup.id,name,unit,price,maxOrder});
-    allItems.push({id,supplierId:activeSup.id,name,unit,price,maxOrder});
+    await apiPost({action:'addItem',id,supplierId:activeSup.id,name,unit,price,maxOrder,category});
+    allItems.push({id,supplierId:activeSup.id,name,unit,price,maxOrder,category});
     closeOverlay('mo-item');
     renderItems();
     document.getElementById('s-itm').textContent=allItems.length;
@@ -1951,7 +1978,7 @@ async function silentRefresh(){
       apiGet({action:'getInventory'}).catch(()=>({goods:[]})) // soft-fail if Scarlett not set up yet
     ]);
     suppliers=(d.suppliers||[]).map(r=>({id:String(r[0]||''),name:String(r[1]||''),logo:String(r[2]||'')})).filter(s=>s.id&&s.name);
-    allItems=(d.items||[]).map(r=>({id:String(r[0]||''),supplierId:String(r[1]||''),name:String(r[2]||''),unit:String(r[3]||''),price:parseFloat(r[4])||0,maxOrder:r[5]!==''&&r[5]!==null&&r[5]!==undefined?parseInt(r[5])||0:0,imageUrl:String(r[6]||'')})).filter(i=>i.id&&i.name);
+    allItems=(d.items||[]).map(r=>({id:String(r[0]||''),supplierId:String(r[1]||''),name:String(r[2]||''),unit:String(r[3]||''),price:parseFloat(r[4])||0,maxOrder:r[5]!==''&&r[5]!==null&&r[5]!==undefined?parseInt(r[5])||0:0,imageUrl:String(r[6]||''),category:String(r[7]||'')})).filter(i=>i.id&&i.name);
     allOrders=(d.orders||[]).map(r=>({orderId:String(r[0]||''),date:fmtDate(r[1]),supplierId:String(r[2]||''),supplierName:String(r[3]||''),itemId:String(r[4]||''),itemName:String(r[5]||''),qty:parseFloat(r[6])||0,unit:String(r[7]||''),price:parseFloat(r[8])||0,notes:String(r[9]||'')})).filter(o=>o.orderId);
     inventoryGoods=(dInv.goods||[]).map(r=>({id:String(r[0]||''),name:String(r[1]||''),quantity:parseFloat(r[4])||0,minStockQty:parseFloat(r[5])||0})).filter(g=>g.id&&g.name);
     if(curPage==='home')renderHome();
