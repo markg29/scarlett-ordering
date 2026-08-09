@@ -1091,7 +1091,7 @@ function renderItems(){
                   ${item.price>0?`<span class="ir-price">₱${item.price.toFixed(2)}</span>`:''}
                   ${freq>=3?`<span style="background:#e65100;color:#fff;border-radius:999px;padding:1px 7px;font-size:10px;font-weight:800;">🔥 Madalas</span>`:''}
                   ${hasMax?`<span style="background:var(--warnbg);color:var(--warn);border-radius:999px;padding:1px 6px;font-size:10px;font-weight:700;">MAX ${item.maxOrder}</span>`:''}
-                  ${stockQty!==null?`<span style="background:${lowStock?'var(--dangerbg)':'var(--surface)'};color:${lowStock?'var(--danger)':'var(--ink3)'};border-radius:999px;padding:1px 6px;font-size:10px;font-weight:700;">📦 ${stockQty}</span>`:''}
+                  ${stockQty!==null?`<span style="background:${lowStock?'var(--dangerbg)':'var(--surface)'};color:${lowStock?'var(--danger)':'var(--ink3)'};border-radius:999px;padding:1px 6px;font-size:10px;font-weight:700;">📦 ${stockQty} Stocks</span>`:''}
                 </div>
               </div>
 
@@ -2290,4 +2290,4 @@ setInterval(silentRefresh, 30000);
 loadAll();
 </script>
 </body>
-</html>
+</html> 
