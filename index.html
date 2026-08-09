@@ -1792,6 +1792,7 @@ async function saveEditItem(){
     if(ci>=0)cart[ci]={...cart[ci],name,unit,price};
     closeOverlay('mo-edit-item');
     renderItems();
+    if(curPage==='products') renderProducts();
     showSaveSuccess('Item na-update!');
   }catch(e){toast('❌ '+e.message,'err');}
   finally{btn.textContent='I-save';btn.disabled=false;}
@@ -1824,6 +1825,7 @@ async function saveItem(){
     allItems.push({id,supplierId:activeSup.id,name,unit,price,maxOrder,category});
     closeOverlay('mo-item');
     renderItems();
+    if(curPage==='products') renderProducts();
     document.getElementById('s-itm').textContent=allItems.length;
     showSaveSuccess('Item na-add!');
   }catch(e){toast('❌ '+e.message,'err');}
@@ -1854,6 +1856,7 @@ function askDel(type,id,name){
         allItems=allItems.filter(i=>i.id!==id);
         cart=cart.filter(c=>c.itemId!==id);
         renderItems();
+        if(curPage==='products') renderProducts();
         document.getElementById('s-itm').textContent=allItems.length;
       }
       showSaveSuccess(name+' na-delete!');
