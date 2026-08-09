@@ -1043,14 +1043,14 @@ function renderItems(){
     `${EM[idx<0?0:idx%EM.length]} <strong>${activeSup.name}</strong>`;
 
   const myItems=allItems.filter(i=>i.supplierId===activeSup.id);
-  // Sort by order frequency — count how many times each item was ordered
+  // Build freqMap for 🔥 badge display only — no sorting
   const freqMap={};
   allOrders.forEach(o=>{
     if(o.supplierId===activeSup.id){
       freqMap[o.itemId]=(freqMap[o.itemId]||0)+1;
     }
   });
-  myItems.sort((a,b)=>(freqMap[b.id]||0)-(freqMap[a.id]||0));
+  // Items stay in original Sheets order (no sort)
   if(!myItems.length){
     document.getElementById('items-wrap').innerHTML=`<div class="empty"><div class="empty-ic">📦</div><div class="empty-h">Walang items pa</div><div class="empty-b">I-tap ang "Magdagdag ng Item" sa baba.</div></div>`;
   }else{
