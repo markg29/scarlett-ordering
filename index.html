@@ -548,8 +548,8 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--surface);color:
 
 <!-- PAGE: ITEMS -->
 <div class="page" id="pg-items" style="padding-bottom:calc(var(--TAB) + 100px);">
-  <!-- CHECK PROGRESS BAR -->
-  <div id="check-bar" style="display:none;margin:0 14px 10px;background:var(--white);border-radius:12px;padding:10px 14px;box-shadow:0 1px 4px rgba(0,0,0,.06);">
+  <!-- CHECK PROGRESS BAR - sticky so visible while scrolling -->
+  <div id="check-bar" style="display:none;position:sticky;top:0;z-index:10;background:var(--white);border-bottom:1px solid var(--line);padding:10px 14px;margin-bottom:6px;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
       <div id="check-bar-text" style="font-size:12px;font-weight:700;color:var(--ink2);">0 / 0 na-check</div>
       <button onclick="skipAllRemaining()" style="font-size:11px;font-weight:700;color:var(--ink3);background:none;border:none;cursor:pointer;padding:2px 6px;">Skip lahat ✕</button>
@@ -1055,14 +1055,9 @@ function renderItems(){
     document.getElementById('items-wrap').innerHTML=`<div class="empty"><div class="empty-ic">📦</div><div class="empty-h">Walang items pa</div><div class="empty-b">I-tap ang "Magdagdag ng Item" sa baba.</div></div>`;
   }else{
     // Group items by category
-    // Separate frequent items (3+ orders) from the rest
-    const FREQ_THRESHOLD = 3;
-    const madalasItems = myItems.filter(i=>(freqMap[i.id]||0) >= FREQ_THRESHOLD);
-    const regularItems = myItems.filter(i=>(freqMap[i.id]||0) < FREQ_THRESHOLD);
-
-    // Group regular items by category
+    // Group by category (sorted by frequency within each category)
     const grouped={};
-    regularItems.forEach(item=>{
+    myItems.forEach(item=>{
       const cat=item.category&&item.category.trim()?item.category.trim():'Iba pa';
       if(!grouped[cat])grouped[cat]=[];
       grouped[cat].push(item);
@@ -1099,7 +1094,7 @@ function renderItems(){
           <div class="ir-left">
             <div class="ir-name">${item.name}${item.unit?' <span style="font-weight:700;color:var(--brand);font-size:11px;background:var(--brandbg);padding:1px 6px;border-radius:4px;margin-left:4px;">'+item.unit+'</span>':''}</div>
             <div class="ir-sub">
-              ${freq>=3?`<span style="background:#fff3e0;color:#e65100;border-radius:999px;padding:2px 7px;font-size:10px;font-weight:700;">🔥 ${freq}x</span>`:''}
+              ${freq>=3?`<span style="background:#e65100;color:#fff;border-radius:999px;padding:3px 9px;font-size:11px;font-weight:800;">🔥 ${freq}x</span>`:''}
               ${priceTag}
               ${maxBadge}
               ${stockBadge}
@@ -1116,22 +1111,13 @@ function renderItems(){
             <button class="cart-btn${inCart?' in':''}" id="cb-${item.id}"
               onclick="toggleCart('${item.id}')">${inCart?'✓':'+'}</button>`}
             <button class="skip-btn${skippedItems.has(item.id)?' skipped':''}" id="skip-${item.id}"
-              onclick="toggleSkip('${item.id}')">${skippedItems.has(item.id)?'↩':'✕'}</button>
+              onclick="toggleSkip('${item.id}')">${skippedItems.has(item.id)?'↩ Ibalik':'✕ Skip'}</button>
             <button class="edit-btn" onclick="openEditItem('${item.id}')">✎</button>
           </div>
         </div>`;
     };
 
     document.getElementById('items-wrap').innerHTML=
-      // 🔥 Madalas section — frequent items always at top
-      (madalasItems.length ? `
-        <div style="padding:10px 14px 4px;display:flex;align-items:center;gap:8px;">
-          <div style="font-size:11px;font-weight:800;color:#e65100;text-transform:uppercase;letter-spacing:.6px;">🔥 Madalas</div>
-          <div style="flex:1;height:1px;background:#ffe0b2;"></div>
-          <div style="font-size:11px;color:#e65100;font-weight:600;">${madalasItems.length}</div>
-        </div>
-        <div class="items-list">${madalasItems.map(renderItem).join('')}</div>
-      ` : '')+
       cats.map(cat=>`
         <div style="padding:10px 14px 4px;display:flex;align-items:center;gap:8px;">
           <div style="font-size:11px;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.6px;">${cat}</div>
@@ -1341,8 +1327,18 @@ function goToReview(){
   const unchecked=myItems.filter(i=>!checkedCart.has(i.id)&&!skippedItems.has(i.id));
   if(unchecked.length>0){
     toast(`⚠️ May ${unchecked.length} items pa na hindi nache-check!`,'warn');
-    // Scroll to check bar to show progress
-    document.getElementById('check-bar')?.scrollIntoView({behavior:'smooth',block:'start'});
+    // Scroll to first unchecked item and highlight it
+    const firstUncheckedId=unchecked[0].id;
+    // Find the item row — check both madalas and regular sections
+    const firstRow=document.querySelector(`[id^="irow-${firstUncheckedId}"]`)
+      || document.getElementById('irow-'+firstUncheckedId);
+    if(firstRow){
+      firstRow.scrollIntoView({behavior:'smooth',block:'center'});
+      // Flash highlight so user notices it
+      firstRow.style.transition='background .15s';
+      firstRow.style.background='#fff3cd';
+      setTimeout(()=>{firstRow.style.background='';},1200);
+    }
     return;
   }
   renderReview();
@@ -1593,19 +1589,19 @@ function printHistoryOrder(orderId){
   <style>body{font-family:Arial,sans-serif;padding:24px;color:#111;max-width:600px;margin:0 auto;}h2{color:#1a56db;font-size:20px;margin-bottom:4px;}.meta{font-size:12px;color:#555;margin-bottom:18px;line-height:1.7;}table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:12px;}th{background:#eff6ff;padding:8px 10px;text-align:left;border-bottom:2px solid #1a56db;font-size:11px;text-transform:uppercase;}td{padding:8px 10px;border-bottom:1px solid #eee;}.tot{text-align:right;font-size:18px;font-weight:800;color:#059669;margin:8px 0 20px;}.foot{font-size:11px;color:#aaa;border-top:1px solid #eee;padding-top:10px;}@media print{.pb{display:none}}
 /* ── SKIP BUTTON ── */
 .skip-btn{
-  width:28px;height:28px;border-radius:8px;border:none;
+  height:28px;padding:0 10px;border-radius:8px;border:none;
   background:var(--surface);color:var(--ink3);
-  font-size:13px;font-weight:700;cursor:pointer;
+  font-size:11px;font-weight:700;cursor:pointer;
   display:flex;align-items:center;justify-content:center;
-  flex-shrink:0;transition:all .15s;
+  flex-shrink:0;transition:all .15s;white-space:nowrap;gap:3px;
 }
 .skip-btn:active{background:var(--line);}
 .skip-btn.skipped{
-  background:var(--line);color:var(--ink3);
+  background:var(--brandbg);color:var(--brand);
   font-size:11px;
 }
 .item-row.skipped-row{
-  opacity:0.4;
+  opacity:0.45;
 }
 </style>
   </head><body>
@@ -2292,4 +2288,4 @@ setInterval(silentRefresh, 30000);
 loadAll();
 </script>
 </body>
-</html> 
+</html>
