@@ -548,6 +548,16 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--surface);color:
 
 <!-- PAGE: ITEMS -->
 <div class="page" id="pg-items" style="padding-bottom:calc(var(--TAB) + 100px);">
+  <!-- CHECK PROGRESS BAR -->
+  <div id="check-bar" style="display:none;margin:0 14px 10px;background:var(--white);border-radius:12px;padding:10px 14px;box-shadow:0 1px 4px rgba(0,0,0,.06);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+      <div id="check-bar-text" style="font-size:12px;font-weight:700;color:var(--ink2);">0 / 0 na-check</div>
+      <button onclick="skipAllRemaining()" style="font-size:11px;font-weight:700;color:var(--ink3);background:none;border:none;cursor:pointer;padding:2px 6px;">Skip lahat ✕</button>
+    </div>
+    <div style="height:6px;background:var(--line);border-radius:999px;overflow:hidden;">
+      <div id="check-bar-fill" style="height:100%;background:var(--ok);border-radius:999px;transition:width .3s;width:0%;"></div>
+    </div>
+  </div>
   <div style="padding:4px 0 0;">
     <div class="sup-pill" id="sup-pill">🏭 Supplier</div>
   </div>
@@ -826,7 +836,7 @@ const EM  = ['🏭','🚛','🏪','🏬','🌾','🐟','🥩','🥦','🧴','�
 // STATE
 // ════════════════════════════════════════
 let suppliers=[], allItems=[], allOrders=[];
-let activeSup=null, cart=[], lastOrder=null;
+let activeSup=null, cart=[], lastOrder=null, skippedItems=new Set();
 let pendingDelete=null;
 let inventoryGoods=[]; // from Scarlett Inventory System (Goods sheet), matched by item name
 
@@ -998,6 +1008,7 @@ function confirmSupplierSwitch(){
 function doSwitchSupplier(id,name){
   activeSup={id,name};
   cart=[];
+  skippedItems=new Set();
   const itemsEl=document.getElementById('pg-items');
   if(itemsEl)itemsEl.scrollTop=0;
   renderHome();
@@ -1020,6 +1031,7 @@ function renderItemsSilent(){
 }
 
 function renderItems(){
+  updateCheckProgress();
   if(!activeSup){
     document.getElementById('items-wrap').innerHTML=`<div class="empty"><div class="empty-ic">👆</div><div class="empty-h">Walang supplier</div><div class="empty-b">Pumili muna ng supplier sa Home.</div></div>`;
     document.getElementById('sup-pill').textContent='🏭 Walang supplier';
@@ -1095,13 +1107,16 @@ function renderItems(){
             </div>
           </div>
           <div class="ir-controls">
+            ${skippedItems.has(item.id)?'':`
             <button class="qbtn" onclick="adjQ('${item.id}',-1)">−</button>
             <input class="qnum${inCart?' active':''}" id="qn-${item.id}"
               type="number" value="${qty}" min="0" ${maxAttr} inputmode="numeric" placeholder="0"
               oninput="autoQty('${item.id}',this.value)"/>
             <button class="qbtn" onclick="adjQ('${item.id}',1)">+</button>
             <button class="cart-btn${inCart?' in':''}" id="cb-${item.id}"
-              onclick="toggleCart('${item.id}')">${inCart?'✓':'+'}</button>
+              onclick="toggleCart('${item.id}')">${inCart?'✓':'+'}</button>`}
+            <button class="skip-btn${skippedItems.has(item.id)?' skipped':''}" id="skip-${item.id}"
+              onclick="toggleSkip('${item.id}')">${skippedItems.has(item.id)?'↩':'✕'}</button>
             <button class="edit-btn" onclick="openEditItem('${item.id}')">✎</button>
           </div>
         </div>`;
@@ -1201,6 +1216,7 @@ function autoQty(itemId,val){
     if(qn)qn.classList.add('active');
     updateCartBadge(itemId,qty,true);
     refreshFloat();
+    updateCheckProgress();
   }
 }
 
@@ -1250,6 +1266,7 @@ function toggleCart(itemId){
     toast(`${item.name} na-add ✅`,'ok');
   }
   refreshFloat();
+  updateCheckProgress();
 }
 
 function refreshFloat(){
@@ -1264,8 +1281,70 @@ function refreshFloat(){
 // ════════════════════════════════════════
 // REVIEW
 // ════════════════════════════════════════
+// ════════════════════════════════════════
+// SKIP + PROGRESS
+// ════════════════════════════════════════
+function toggleSkip(itemId){
+  if(skippedItems.has(itemId)){
+    skippedItems.delete(itemId);
+  }else{
+    // Remove from cart if being skipped
+    const ex=cart.findIndex(c=>c.itemId===itemId);
+    if(ex>=0){
+      cart.splice(ex,1);
+      refreshFloat();
+    }
+    skippedItems.add(itemId);
+  }
+  renderItemsSilent();
+  updateCheckProgress();
+}
+
+function updateCheckProgress(){
+  const myItems=allItems.filter(i=>i.supplierId===activeSup?.id);
+  const total=myItems.length;
+  if(!total){
+    document.getElementById('check-bar').style.display='none';
+    return;
+  }
+  const checkedCart=new Set(cart.map(c=>c.itemId));
+  const checked=myItems.filter(i=>checkedCart.has(i.id)||skippedItems.has(i.id)).length;
+  const pct=Math.round(checked/total*100);
+  const bar=document.getElementById('check-bar');
+  const txt=document.getElementById('check-bar-text');
+  const fill=document.getElementById('check-bar-fill');
+  if(bar)bar.style.display='block';
+  if(txt)txt.textContent=`${checked} / ${total} na-check`;
+  if(fill){
+    fill.style.width=pct+'%';
+    fill.style.background=pct===100?'var(--ok)':'var(--brand)';
+  }
+}
+
+function skipAllRemaining(){
+  const myItems=allItems.filter(i=>i.supplierId===activeSup?.id);
+  const checkedCart=new Set(cart.map(c=>c.itemId));
+  myItems.forEach(i=>{
+    if(!checkedCart.has(i.id)&&!skippedItems.has(i.id)){
+      skippedItems.add(i.id);
+    }
+  });
+  renderItemsSilent();
+  updateCheckProgress();
+}
+
 function goToReview(){
   if(!cart.length){toast('Wala pang items!','err');return;}
+  // Check if all items are checked (carted or skipped)
+  const myItems=allItems.filter(i=>i.supplierId===activeSup?.id);
+  const checkedCart=new Set(cart.map(c=>c.itemId));
+  const unchecked=myItems.filter(i=>!checkedCart.has(i.id)&&!skippedItems.has(i.id));
+  if(unchecked.length>0){
+    toast(`⚠️ May ${unchecked.length} items pa na hindi nache-check!`,'warn');
+    // Scroll to check bar to show progress
+    document.getElementById('check-bar')?.scrollIntoView({behavior:'smooth',block:'start'});
+    return;
+  }
   renderReview();
   goPage('review');
   document.getElementById('float-bar').classList.add('hide');
@@ -1355,6 +1434,7 @@ function showSuccess(){
 }
 function newTxn(){
   cart=[];lastOrder=null;activeSup=null;
+  skippedItems=new Set();
   document.getElementById('global-notes').value='';
   document.getElementById('float-bar').classList.add('hide');
   // Reset scroll for home when starting fresh
@@ -1510,7 +1590,24 @@ function printHistoryOrder(orderId){
   const g=rows[0];
   const w=window.open('','_blank');
   w.document.write(`<!DOCTYPE html><html><head><title>Order ${orderId}</title>
-  <style>body{font-family:Arial,sans-serif;padding:24px;color:#111;max-width:600px;margin:0 auto;}h2{color:#1a56db;font-size:20px;margin-bottom:4px;}.meta{font-size:12px;color:#555;margin-bottom:18px;line-height:1.7;}table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:12px;}th{background:#eff6ff;padding:8px 10px;text-align:left;border-bottom:2px solid #1a56db;font-size:11px;text-transform:uppercase;}td{padding:8px 10px;border-bottom:1px solid #eee;}.tot{text-align:right;font-size:18px;font-weight:800;color:#059669;margin:8px 0 20px;}.foot{font-size:11px;color:#aaa;border-top:1px solid #eee;padding-top:10px;}@media print{.pb{display:none}}</style>
+  <style>body{font-family:Arial,sans-serif;padding:24px;color:#111;max-width:600px;margin:0 auto;}h2{color:#1a56db;font-size:20px;margin-bottom:4px;}.meta{font-size:12px;color:#555;margin-bottom:18px;line-height:1.7;}table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:12px;}th{background:#eff6ff;padding:8px 10px;text-align:left;border-bottom:2px solid #1a56db;font-size:11px;text-transform:uppercase;}td{padding:8px 10px;border-bottom:1px solid #eee;}.tot{text-align:right;font-size:18px;font-weight:800;color:#059669;margin:8px 0 20px;}.foot{font-size:11px;color:#aaa;border-top:1px solid #eee;padding-top:10px;}@media print{.pb{display:none}}
+/* ── SKIP BUTTON ── */
+.skip-btn{
+  width:28px;height:28px;border-radius:8px;border:none;
+  background:var(--surface);color:var(--ink3);
+  font-size:13px;font-weight:700;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;transition:all .15s;
+}
+.skip-btn:active{background:var(--line);}
+.skip-btn.skipped{
+  background:var(--line);color:var(--ink3);
+  font-size:11px;
+}
+.item-row.skipped-row{
+  opacity:0.4;
+}
+</style>
   </head><body>
   <h2>🛒 Purchase Order</h2>
   <div class="meta"><b>Order ID:</b> ${orderId}<br><b>Supplier:</b> ${g.supplierName}<br><b>Petsa:</b> ${g.date}</div>
