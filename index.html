@@ -1109,7 +1109,7 @@ function renderItems(){
                 onclick="toggleCart('${item.id}')">${inCart?'✓':'+'}</button>
               ${inCart?`<span style="font-size:11px;font-weight:700;color:var(--ok);">✓ ${inCart.qty} sa cart</span>`:''}`}
               <button class="skip-btn${isSkipped?' skipped':''}" id="skip-${item.id}"
-                onclick="toggleSkip('${item.id}')">${isSkipped?'↩ Ibalik':'— Wala'}</button>
+                onclick="toggleSkip('${item.id}')">${isSkipped?'↩ Ibalik':'✕ Skip'}</button>
             </div>
           </div>
         </div>`;
@@ -1589,15 +1589,17 @@ function printHistoryOrder(orderId){
 .skip-btn{
   height:30px;padding:0 12px;border-radius:999px;
   border:1.5px solid var(--line);
-  background:var(--white);color:var(--ink3);
+  background:var(--white);color:var(--ink2);
   font-size:11px;font-weight:700;cursor:pointer;
   display:flex;align-items:center;justify-content:center;
   flex-shrink:0;transition:all .15s;white-space:nowrap;gap:4px;
+  box-shadow:0 1px 3px rgba(0,0,0,.06);
 }
-.skip-btn:active{border-color:var(--ink3);background:var(--surface);}
+.skip-btn:active{background:var(--surface);}
 .skip-btn.skipped{
   border-color:var(--brand);
   background:var(--brandbg);color:var(--brand);
+  box-shadow:none;
 }
 .item-row.skipped-row{
   opacity:0.4;
@@ -2288,4 +2290,4 @@ setInterval(silentRefresh, 30000);
 loadAll();
 </script>
 </body>
-</html> 
+</html>
