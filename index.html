@@ -485,6 +485,28 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--surface);color:
 .prod-cat-label{font-size:11px;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.6px;}
 .prod-cat-line{flex:1;height:1px;background:var(--line);}
 .prod-cat-count{font-size:11px;color:var(--ink3);font-weight:600;}
+
+/* ── SKIP BUTTON ── */
+.skip-btn{
+  height:30px;padding:0 12px;border-radius:999px;
+  border:1.5px solid var(--danger);
+  background:var(--white);color:var(--danger);
+  font-size:11px;font-weight:700;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;transition:all .15s;white-space:nowrap;gap:4px;
+  box-shadow:0 1px 3px rgba(0,0,0,.06);
+}
+.skip-btn:active{background:var(--dangerbg);}
+.skip-btn.skipped{
+  border-color:var(--brand);
+  background:var(--brandbg);color:var(--brand);
+  box-shadow:none;
+}
+.item-row.skipped-row{
+  background:#fef2f2 !important;
+  opacity:0.7;
+}
+
 </style>
 </head>
 <body>
@@ -1586,28 +1608,7 @@ function printHistoryOrder(orderId){
   const g=rows[0];
   const w=window.open('','_blank');
   w.document.write(`<!DOCTYPE html><html><head><title>Order ${orderId}</title>
-  <style>body{font-family:Arial,sans-serif;padding:24px;color:#111;max-width:600px;margin:0 auto;}h2{color:#1a56db;font-size:20px;margin-bottom:4px;}.meta{font-size:12px;color:#555;margin-bottom:18px;line-height:1.7;}table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:12px;}th{background:#eff6ff;padding:8px 10px;text-align:left;border-bottom:2px solid #1a56db;font-size:11px;text-transform:uppercase;}td{padding:8px 10px;border-bottom:1px solid #eee;}.tot{text-align:right;font-size:18px;font-weight:800;color:#059669;margin:8px 0 20px;}.foot{font-size:11px;color:#aaa;border-top:1px solid #eee;padding-top:10px;}@media print{.pb{display:none}}
-/* ── SKIP BUTTON ── */
-.skip-btn{
-  height:30px;padding:0 12px;border-radius:999px;
-  border:1.5px solid var(--danger);
-  background:var(--white);color:var(--danger);
-  font-size:11px;font-weight:700;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;
-  flex-shrink:0;transition:all .15s;white-space:nowrap;gap:4px;
-  box-shadow:0 1px 3px rgba(0,0,0,.06);
-}
-.skip-btn:active{background:var(--dangerbg);}
-.skip-btn.skipped{
-  border-color:var(--brand);
-  background:var(--brandbg);color:var(--brand);
-  box-shadow:none;
-}
-.item-row.item-row.skipped-row{
-  background:#fef2f2 !important;
-  opacity:0.7;
-}
-</style>
+  <style>body{font-family:Arial,sans-serif;padding:24px;color:#111;max-width:600px;margin:0 auto;}h2{color:#1a56db;font-size:20px;margin-bottom:4px;}.meta{font-size:12px;color:#555;margin-bottom:18px;line-height:1.7;}table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:12px;}th{background:#eff6ff;padding:8px 10px;text-align:left;border-bottom:2px solid #1a56db;font-size:11px;text-transform:uppercase;}td{padding:8px 10px;border-bottom:1px solid #eee;}.tot{text-align:right;font-size:18px;font-weight:800;color:#059669;margin:8px 0 20px;}.foot{font-size:11px;color:#aaa;border-top:1px solid #eee;padding-top:10px;}@media print{.pb{display:none}}</style>
   </head><body>
   <h2>🛒 Purchase Order</h2>
   <div class="meta"><b>Order ID:</b> ${orderId}<br><b>Supplier:</b> ${g.supplierName}<br><b>Petsa:</b> ${g.date}</div>
