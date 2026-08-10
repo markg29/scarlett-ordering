@@ -1073,16 +1073,13 @@ function restoreCartState(){
     const state = JSON.parse(saved);
     if(!state.activeSup || !state.cart?.length) return;
 
-    // Validate that the saved supplier and items still exist
+    // Validate supplier still exists
     const sup = suppliers.find(s=>s.id===state.activeSup.id);
     if(!sup) return;
 
-    // Restore only cart items that still exist in allItems
-    const validCart = state.cart.filter(c=>allItems.find(i=>i.id===c.itemId));
-    if(!validCart.length) return;
-
+    // Restore full cart — don't filter, allItems may not be fully loaded yet
     activeSup = state.activeSup;
-    cart = validCart;
+    cart = state.cart || [];
     skippedItems = new Set(state.skippedItems||[]);
     if(state.globalNotes){
       const notesEl = document.getElementById('global-notes');
@@ -1110,6 +1107,7 @@ async function loadAll(){
     inventoryGoods=(dInv.goods||[]).map(r=>({id:String(r[0]||''),name:String(r[1]||''),quantity:parseFloat(r[4])||0,minStockQty:parseFloat(r[5])||0})).filter(g=>g.id&&g.name);
     renderHome();
     restoreCartState(); // Restore cart if there was one before refresh
+    if(activeSup) renderItems(); // Re-render items page if supplier was restored
     toast('Na-load na ✅','ok');
   }catch(e){
     toast('❌ '+e.message,'err');
@@ -1188,11 +1186,9 @@ function renderHome(){
 let pendingSupplierSwitch=null;
 
 function pickSupplier(id,name){
-  // Same supplier tapped again - just navigate, keep cart
+  // Same supplier tapped again - open Quick Mode
   if(activeSup && activeSup.id===id){
-    goPage('items');
-    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
-    document.getElementById('tb-items')?.classList.add('on');
+    startQuickMode();
     return;
   }
   // If switching to a DIFFERENT supplier while cart has unsaved items, warn first
@@ -1228,9 +1224,8 @@ function doSwitchSupplier(id,name){
   if(itemsEl)itemsEl.scrollTop=0;
   renderHome();
   renderItems();
-  goPage('items');
-  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
-  document.getElementById('tb-items')?.classList.add('on');
+  // Default: open Quick Mode directly
+  startQuickMode();
 }
 
 // ════════════════════════════════════════
@@ -2438,6 +2433,15 @@ function goBack(){
   if(p!=='items')document.getElementById('float-bar').classList.add('hide');
 }
 
+function switchToListView(){
+  // Hide Quick Mode overlay, go to Items list page
+  const ov=document.getElementById('qm-overlay');
+  if(ov)ov.style.display='none';
+  goPage('items');
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  document.getElementById('tb-items')?.classList.add('on');
+}
+
 function qmExit(){
   const checked=qmIndex;
   if(checked>0){
@@ -2492,8 +2496,7 @@ function E(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace
 // AUTO-REFRESH
 // ════════════════════════════════════════
 async function silentRefresh(){
-  // Only refresh if user is not in the middle of ordering
-  if(cart.length > 0) return;
+  // Don't refresh during checkout flow
   if(curPage === 'review' || curPage === 'success') return;
   try{
     const [d, dInv] = await Promise.all([
@@ -2508,6 +2511,8 @@ async function silentRefresh(){
     else if(curPage==='history')renderHistorySilent(); // preserve open cards
     else if(curPage==='items')renderItemsSilent();
     else if(curPage==='products')renderProducts();
+    // Always update float bar in case cart restored
+    refreshFloat();
   }catch(e){}
 }
 // Refresh every 30 seconds silently
@@ -2526,7 +2531,8 @@ loadAll();
     <div style="flex:1;">
       <div style="font-size:16px;font-weight:700;">Quick Mode</div>
     </div>
-    <div id="qm-sup-name" style="font-size:12px;color:var(--ink3);font-weight:600;"></div>
+    <div id="qm-sup-name" style="font-size:12px;color:var(--ink3);font-weight:600;margin-right:6px;"></div>
+    <button onclick="switchToListView()" style="padding:0 12px;height:32px;border-radius:999px;border:1.5px solid var(--line);background:var(--white);color:var(--ink2);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">☰ List</button>
   </div>
   <!-- Progress -->
   <div style="padding:10px 16px;background:var(--white);border-bottom:1px solid var(--line);flex-shrink:0;">
