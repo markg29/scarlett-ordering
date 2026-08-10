@@ -604,43 +604,6 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--surface);color:
   <div class="fb-btn">I-review ang Order →</div>
 </div>
 
-<!-- QUICK MODE OVERLAY (full screen, not a .page) -->
-<div id="qm-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:var(--surface);z-index:500;flex-direction:column;width:100%;max-width:430px;margin:0 auto;">
-  <!-- Nav -->
-  <div style="height:var(--NAV);background:var(--white);border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 14px;gap:10px;flex-shrink:0;">
-    <button onclick="qmExit()" style="width:34px;height:34px;border-radius:10px;border:none;background:var(--surface);font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;">‹</button>
-    <div style="flex:1;">
-      <div style="font-size:16px;font-weight:700;">Quick Mode</div>
-    </div>
-    <div id="qm-sup-name" style="font-size:12px;color:var(--ink3);font-weight:600;"></div>
-  </div>
-  <!-- Progress -->
-  <div style="padding:10px 16px;background:var(--white);border-bottom:1px solid var(--line);flex-shrink:0;">
-    <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
-      <div id="qm-counter" style="font-size:13px;font-weight:700;color:var(--ink2);">0 / 0</div>
-    </div>
-    <div style="height:6px;background:var(--line);border-radius:999px;overflow:hidden;">
-      <div id="qm-bar" style="height:100%;background:var(--brand);border-radius:999px;transition:width .3s;width:0%;"></div>
-    </div>
-  </div>
-  <!-- Card area -->
-  <div id="qm-card-wrap" style="flex:1;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch;"></div>
-  <!-- Controls -->
-  <div style="padding:14px 16px 28px;background:var(--white);border-top:1px solid var(--line);flex-shrink:0;">
-    <div style="display:flex;gap:10px;margin-bottom:10px;">
-      <button id="qm-minus" onclick="qmAdj(-1)" style="width:64px;height:64px;border-radius:16px;border:2px solid var(--line);background:var(--surface);font-size:30px;font-weight:300;color:var(--brand);cursor:pointer;">−</button>
-      <input id="qm-qty" type="number" inputmode="numeric" min="0" placeholder="0"
-        style="flex:1;text-align:center;font-size:36px;font-weight:800;border:2px solid var(--line);border-radius:16px;padding:8px;font-family:inherit;color:var(--ink);background:var(--white);min-width:0;"
-        oninput="qmQtyInput(this.value)"/>
-      <button id="qm-plus" onclick="qmAdj(1)" style="width:64px;height:64px;border-radius:16px;border:2px solid var(--line);background:var(--surface);font-size:30px;font-weight:300;color:var(--brand);cursor:pointer;">+</button>
-    </div>
-    <div style="display:flex;gap:10px;">
-      <button onclick="qmSkip()" style="flex:1;height:52px;border-radius:14px;border:2px solid var(--danger);background:var(--white);color:var(--danger);font-size:14px;font-weight:700;cursor:pointer;">✕ Skip</button>
-      <button onclick="qmNext()" style="flex:2;height:52px;border-radius:14px;border:none;background:var(--brand);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">Susunod →</button>
-    </div>
-  </div>
-</div>
-
 <!-- PAGE: REVIEW -->
 <div class="page" id="pg-review">
   <div id="review-list"></div>
@@ -2555,5 +2518,42 @@ setInterval(silentRefresh, 30000);
 // ════════════════════════════════════════
 loadAll();
 </script>
+<!-- QUICK MODE OVERLAY (full screen, not a .page) -->
+<div id="qm-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:var(--surface);z-index:500;flex-direction:column;width:100%;max-width:430px;margin:0 auto;">
+  <!-- Nav -->
+  <div style="height:var(--NAV);background:var(--white);border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 14px;gap:10px;flex-shrink:0;">
+    <button onclick="qmExit()" style="width:34px;height:34px;border-radius:10px;border:none;background:var(--surface);font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;">‹</button>
+    <div style="flex:1;">
+      <div style="font-size:16px;font-weight:700;">Quick Mode</div>
+    </div>
+    <div id="qm-sup-name" style="font-size:12px;color:var(--ink3);font-weight:600;"></div>
+  </div>
+  <!-- Progress -->
+  <div style="padding:10px 16px;background:var(--white);border-bottom:1px solid var(--line);flex-shrink:0;">
+    <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+      <div id="qm-counter" style="font-size:13px;font-weight:700;color:var(--ink2);">0 / 0</div>
+    </div>
+    <div style="height:6px;background:var(--line);border-radius:999px;overflow:hidden;">
+      <div id="qm-bar" style="height:100%;background:var(--brand);border-radius:999px;transition:width .3s;width:0%;"></div>
+    </div>
+  </div>
+  <!-- Card area -->
+  <div id="qm-card-wrap" style="flex:1;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch;"></div>
+  <!-- Controls -->
+  <div style="padding:14px 16px 28px;background:var(--white);border-top:1px solid var(--line);flex-shrink:0;">
+    <div style="display:flex;gap:10px;margin-bottom:10px;">
+      <button id="qm-minus" onclick="qmAdj(-1)" style="width:64px;height:64px;border-radius:16px;border:2px solid var(--line);background:var(--surface);font-size:30px;font-weight:300;color:var(--brand);cursor:pointer;">−</button>
+      <input id="qm-qty" type="number" inputmode="numeric" min="0" placeholder="0"
+        style="flex:1;text-align:center;font-size:36px;font-weight:800;border:2px solid var(--line);border-radius:16px;padding:8px;font-family:inherit;color:var(--ink);background:var(--white);min-width:0;"
+        oninput="qmQtyInput(this.value)"/>
+      <button id="qm-plus" onclick="qmAdj(1)" style="width:64px;height:64px;border-radius:16px;border:2px solid var(--line);background:var(--surface);font-size:30px;font-weight:300;color:var(--brand);cursor:pointer;">+</button>
+    </div>
+    <div style="display:flex;gap:10px;">
+      <button onclick="qmSkip()" style="flex:1;height:52px;border-radius:14px;border:2px solid var(--danger);background:var(--white);color:var(--danger);font-size:14px;font-weight:700;cursor:pointer;">✕ Skip</button>
+      <button onclick="qmNext()" style="flex:2;height:52px;border-radius:14px;border:none;background:var(--brand);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">Susunod →</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
