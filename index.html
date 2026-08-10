@@ -891,13 +891,13 @@ async function apiPost(b){
 // ════════════════════════════════════════
 function fmtDate(v){
   if(!v)return '';
-  // If it's already a nice string (not ISO), return as-is
   if(typeof v==='string'&&!v.includes('T')&&!v.match(/^\d{4}-\d{2}-\d{2}/))return v;
   try{
     const d=new Date(v);
     if(isNaN(d.getTime()))return String(v);
-    return d.toLocaleDateString('en-PH',{year:'numeric',month:'numeric',day:'numeric'})+
-           ' '+d.toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'});
+    const datePart=d.toLocaleDateString('en-PH',{year:'numeric',month:'long',day:'numeric'});
+    const timePart=d.toLocaleTimeString('en-PH',{hour:'numeric',minute:'2-digit',hour12:true});
+    return `${datePart}, ${timePart}`;
   }catch(e){return String(v);}
 }
 
@@ -920,8 +920,16 @@ function startQuickMode(){
   if(!activeSup){toast('Pumili muna ng supplier','err');return;}
   qmItems=allItems.filter(i=>i.supplierId===activeSup.id);
   if(!qmItems.length){toast('Walang items ang supplier na ito','err');return;}
-  // Resume from saved position if available, otherwise start fresh
+  // Resume from saved position, skip already-decided items
   if(qmIndex >= qmItems.length) qmIndex=0;
+  // Advance past items already in cart or skipped
+  while(qmIndex < qmItems.length){
+    const item=qmItems[qmIndex];
+    const inCart=cart.find(c=>c.itemId===item.id);
+    const isSkipped=skippedItems.has(item.id);
+    if(!inCart && !isSkipped) break;
+    qmIndex++;
+  }
   qmCurrentQty=0;
   const ov=document.getElementById('qm-overlay');
   if(ov)ov.style.display='flex';
@@ -2440,12 +2448,13 @@ function goBack(){
 }
 
 function switchToListView(){
-  // Hide Quick Mode overlay, go to Items list page
   const ov=document.getElementById('qm-overlay');
   if(ov)ov.style.display='none';
+  renderItems();
   goPage('items');
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
   document.getElementById('tb-items')?.classList.add('on');
+  refreshFloat();
 }
 
 function qmExit(){
@@ -2467,11 +2476,14 @@ function qmExit(){
 
 function qmExitConfirm(){
   saveCartState();
-  refreshFloat();
-  renderItems();
-  updateCheckProgress();
   const ov3=document.getElementById('qm-overlay');
   if(ov3)ov3.style.display='none';
+  renderItems();
+  updateCheckProgress();
+  goPage('items');
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  document.getElementById('tb-items')?.classList.add('on');
+  refreshFloat();
 }
 
 // ════════════════════════════════════════
