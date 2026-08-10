@@ -623,11 +623,13 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--surface);color:
   <!-- Bottom Actions -->
   <div style="position:sticky;bottom:calc(var(--TAB)+10px);padding:0 14px;display:flex;flex-direction:column;gap:8px;margin-top:16px;">
     <div style="display:flex;gap:8px;align-items:center;">
-      <button class="qbtn" style="width:44px;height:44px;border-radius:12px;font-size:20px;" onclick="qmAdj(-1)">−</button>
+      <button onclick="qmAdj(-1)"
+        style="width:56px;height:56px;border-radius:14px;border:2px solid var(--line);background:var(--white);font-size:26px;font-weight:700;color:var(--brand);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">−</button>
       <input id="qm-qty" type="number" inputmode="numeric" min="0" placeholder="0"
-        style="flex:1;text-align:center;font-size:28px;font-weight:800;border:2px solid var(--line);border-radius:14px;padding:10px;font-family:inherit;color:var(--ink);"
+        style="flex:1;text-align:center;font-size:32px;font-weight:800;border:2px solid var(--line);border-radius:14px;padding:12px;font-family:inherit;color:var(--ink);"
         oninput="qmQtyInput(this.value)"/>
-      <button class="qbtn" style="width:44px;height:44px;border-radius:12px;font-size:20px;" onclick="qmAdj(1)">+</button>
+      <button onclick="qmAdj(1)"
+        style="width:56px;height:56px;border-radius:14px;border:2px solid var(--line);background:var(--white);font-size:26px;font-weight:700;color:var(--brand);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">+</button>
     </div>
     <div style="display:flex;gap:8px;">
       <button onclick="qmSkip()"
@@ -1029,24 +1031,48 @@ function qmQtyInput(val){
 
 function qmNext(){
   const item=qmItems[qmIndex];
-  // Remove from skip if it was skipped
-  skippedItems.delete(item.id);
-  // Update cart
-  const existing=cart.findIndex(c=>c.itemId===item.id);
-  if(qmCurrentQty>0){
-    const entry={itemId:item.id,name:item.name,unit:item.unit,price:item.price,qty:qmCurrentQty,notes:''};
-    if(existing>=0)cart[existing]=entry;
-    else cart.push(entry);
-  }else{
-    // qty=0 means skip
-    if(existing>=0)cart.splice(existing,1);
-    skippedItems.add(item.id);
+  // If qty is 0, must confirm — either skip or go back and add qty
+  if(qmCurrentQty<=0){
+    // Show confirmation in card area
+    document.getElementById('qm-card-wrap').innerHTML+=`
+      <div id="qm-zero-confirm" style="margin-top:10px;background:var(--warnbg);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;">
+        <div style="font-size:13px;font-weight:700;color:var(--warn);">⚠️ Wala kang nilagay na qty. I-skip ba ito?</div>
+        <div style="display:flex;gap:8px;">
+          <button onclick="qmConfirmSkip()" style="flex:1;height:40px;border-radius:10px;border:none;background:var(--danger);color:#fff;font-size:13px;font-weight:700;cursor:pointer;">✕ Oo, I-skip</button>
+          <button onclick="qmDismissConfirm()" style="flex:1;height:40px;border-radius:10px;border:2px solid var(--line);background:var(--white);color:var(--ink2);font-size:13px;font-weight:700;cursor:pointer;">↩ Mag-lagay ng Qty</button>
+        </div>
+      </div>`;
+    return;
   }
+  // Has qty — add to cart
+  skippedItems.delete(item.id);
+  const existing=cart.findIndex(c=>c.itemId===item.id);
+  const entry={itemId:item.id,name:item.name,unit:item.unit,price:item.price,qty:qmCurrentQty,notes:''};
+  if(existing>=0)cart[existing]=entry;
+  else cart.push(entry);
   saveCartState();
   refreshFloat();
   qmIndex++;
   qmCurrentQty=0;
   qmRender();
+}
+
+function qmConfirmSkip(){
+  const item=qmItems[qmIndex];
+  const existing=cart.findIndex(c=>c.itemId===item.id);
+  if(existing>=0)cart.splice(existing,1);
+  skippedItems.add(item.id);
+  saveCartState();
+  refreshFloat();
+  qmIndex++;
+  qmCurrentQty=0;
+  qmRender();
+}
+
+function qmDismissConfirm(){
+  const el=document.getElementById('qm-zero-confirm');
+  if(el)el.remove();
+  document.getElementById('qm-qty')?.focus();
 }
 
 function qmSkip(){
@@ -2439,9 +2465,27 @@ function goPage(name){
   curPage=name;
 }
 function goBack(){
+  // Intercept back from Quick Mode — ask before losing progress
+  if(curPage==='quick'){
+    const checked=qmIndex;
+    const total=qmItems.length;
+    if(checked>0){
+      document.getElementById('qm-card-wrap').innerHTML=`
+        <div style="background:var(--warnbg);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:12px;">
+          <div style="font-size:15px;font-weight:800;color:var(--warn);">⚠️ Aalis sa Quick Mode?</div>
+          <div style="font-size:13px;color:var(--ink2);line-height:1.5;">${checked} items na ang nache-check. Mase-save ang iyong cart pero mababalik ka sa Items page.</div>
+          <div style="display:flex;gap:8px;">
+            <button onclick="qmExitConfirm()" style="flex:1;height:44px;border-radius:12px;border:none;background:var(--danger);color:#fff;font-size:13px;font-weight:700;cursor:pointer;">Oo, umalis</button>
+            <button onclick="qmRender()" style="flex:1;height:44px;border-radius:12px;border:2px solid var(--line);background:var(--white);color:var(--ink2);font-size:13px;font-weight:700;cursor:pointer;">Magpatuloy</button>
+          </div>
+        </div>`;
+      return;
+    }
+    qmExitConfirm();
+    return;
+  }
   const p={items:'home',review:'items',success:'home'}[curPage]||'home';
   if(p==='items'){
-    // Going back from review - save items scroll, render, restore
     const pg=document.getElementById('pg-items');
     const saved=pg?pg.scrollTop:0;
     renderItems();
@@ -2449,6 +2493,14 @@ function goBack(){
   }
   goPage(p);
   if(p!=='items')document.getElementById('float-bar').classList.add('hide');
+}
+
+function qmExitConfirm(){
+  saveCartState();
+  refreshFloat();
+  renderItems();
+  updateCheckProgress();
+  goPage('items');
 }
 
 // ════════════════════════════════════════
@@ -2506,4 +2558,4 @@ setInterval(silentRefresh, 30000);
 loadAll();
 </script>
 </body>
-</html> 
+</html>
