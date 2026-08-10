@@ -1148,8 +1148,9 @@ function renderHome(){
   sortedSuppliers.forEach((s,i)=>{
     const cnt=allItems.filter(it=>it.supplierId===s.id).length;
     const sel=activeSup&&activeSup.id===s.id;
-    const cartIndicator = (sel && cart.length>0)
-      ? `<span style="position:absolute;top:-6px;right:-6px;background:var(--warn);color:#fff;border-radius:999px;min-width:20px;height:20px;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;padding:0 5px;border:2px solid var(--white);z-index:3;">${cart.length}</span>`
+    const supplierCartCount = cart.filter(c=>allItems.find(i=>i.id===c.itemId&&i.supplierId===s.id)).length;
+    const cartIndicator = supplierCartCount>0
+      ? `<span style="position:absolute;top:-6px;right:-6px;background:var(--ok);color:#fff;border-radius:999px;min-width:20px;height:20px;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;padding:0 5px;border:2px solid var(--white);z-index:3;">${supplierCartCount}</span>`
       : '';
     const emoji = EM[i%EM.length];
     const logoHtml = s.logo
@@ -1531,7 +1532,12 @@ function updateCheckProgress(){
   }
 }
 
+let _prevSkippedItems = null; // For undo skip all
+
 function skipAllRemaining(){
+  // Save current state for undo
+  _prevSkippedItems = new Set(skippedItems);
+
   const myItems=allItems.filter(i=>i.supplierId===activeSup?.id);
   const checkedCart=new Set(cart.map(c=>c.itemId));
   myItems.forEach(i=>{
@@ -1541,6 +1547,22 @@ function skipAllRemaining(){
   });
   renderItemsSilent();
   updateCheckProgress();
+  // Show undo toast
+  const el=document.getElementById('toast');
+  el.innerHTML='Lahat naskip &nbsp;<button onclick="undoSkipAll()" style="background:rgba(255,255,255,.25);border:none;border-radius:6px;color:#fff;font-weight:800;padding:2px 8px;cursor:pointer;font-size:12px;">↩ I-undo</button>';
+  el.className='on';
+  clearTimeout(_tt);
+  _tt=setTimeout(()=>{el.className='';el.textContent='';},5000);
+}
+
+function undoSkipAll(){
+  if(_prevSkippedItems===null) return;
+  skippedItems=_prevSkippedItems;
+  _prevSkippedItems=null;
+  renderItemsSilent();
+  updateCheckProgress();
+  saveCartState();
+  toast('Na-undo ang Skip Lahat ✓','ok');
 }
 
 function goToReview(){
@@ -2182,7 +2204,7 @@ async function saveEditOrder(){
   const hasChanges=Object.keys(editOrderChanges).length>0;
   if(!hasNew&&!hasChanges){toast('Walang pagbabago!','warn');return;}
 
-  const btn=document.getElementById('eo-btn');
+const btn=document.getElementById('eo-btn');
   btn.disabled=true;btn.innerHTML='<div class="spin w"></div> Nag-se-save...';
 
   const orig=allOrders.find(r=>r.orderId===editOrderId);
@@ -2411,9 +2433,16 @@ function goTab(name){
     initProductsPage();
     renderProducts();
   }
-  // Hide float bar when leaving items tab, show when on items tab
-  if(name!=='items'){document.getElementById('float-bar').classList.add('hide');}
-  else if(cart.length>0){document.getElementById('float-bar').classList.remove('hide');}
+  // Hide float bar when leaving items tab, show when on items tab or home with active cart
+  if(name==='items'){
+    if(cart.length>0) document.getElementById('float-bar').classList.remove('hide');
+  } else if(name==='home'){
+    // Keep float bar visible on home too if there's an active order
+    if(cart.length>0 && activeSup) document.getElementById('float-bar').classList.remove('hide');
+    else document.getElementById('float-bar').classList.add('hide');
+  } else {
+    document.getElementById('float-bar').classList.add('hide');
+  }
   goPage(name);
 }
 function goPage(name){
@@ -2565,7 +2594,7 @@ loadAll();
   </div>
   <!-- Card area -->
   <div id="qm-card-wrap" style="flex:1;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch;"></div>
-  <!-- Controls -->
+    <!-- Controls -->
   <div style="padding:14px 16px 28px;background:var(--white);border-top:1px solid var(--line);flex-shrink:0;">
     <div style="display:flex;gap:10px;margin-bottom:10px;">
       <button id="qm-minus" onclick="qmAdj(-1)" style="width:64px;height:64px;border-radius:16px;border:2px solid var(--line);background:var(--surface);font-size:30px;font-weight:300;color:var(--brand);cursor:pointer;">−</button>
