@@ -520,7 +520,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--surface);color:
   </div>
   <button id="qm-btn" onclick="startQuickMode()"
     style="display:none;padding:0 12px;height:34px;border-radius:999px;border:none;background:var(--brand);color:#fff;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;">
-    ⚡ Quick
+    ⚡ Quick Mode
   </button>
 </div>
 
@@ -920,7 +920,8 @@ function startQuickMode(){
   if(!activeSup){toast('Pumili muna ng supplier','err');return;}
   qmItems=allItems.filter(i=>i.supplierId===activeSup.id);
   if(!qmItems.length){toast('Walang items ang supplier na ito','err');return;}
-  qmIndex=0;
+  // Resume from saved position if available, otherwise start fresh
+  if(qmIndex >= qmItems.length) qmIndex=0;
   qmCurrentQty=0;
   const ov=document.getElementById('qm-overlay');
   if(ov)ov.style.display='flex';
@@ -995,6 +996,9 @@ function qmNext(){
   const item=qmItems[qmIndex];
   // If qty is 0, must confirm — either skip or go back and add qty
   if(qmCurrentQty<=0){
+    // Remove existing warning if any before adding new one
+    const existing=document.getElementById('qm-zero-confirm');
+    if(existing)existing.remove();
     // Show confirmation in card area
     document.getElementById('qm-card-wrap').innerHTML+=`
       <div id="qm-zero-confirm" style="margin-top:10px;background:var(--warnbg);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;">
@@ -1061,7 +1065,8 @@ function saveCartState(){
       activeSup: activeSup,
       cart: cart,
       skippedItems: [...skippedItems],
-      globalNotes: document.getElementById('global-notes')?.value || ''
+      globalNotes: document.getElementById('global-notes')?.value || '',
+      qmIndex: qmIndex  // Save progress so Quick Mode can resume
     }));
   }catch(e){}
 }
@@ -1080,6 +1085,7 @@ function restoreCartState(){
     // Restore full cart — don't filter, allItems may not be fully loaded yet
     activeSup = state.activeSup;
     cart = state.cart || [];
+    qmIndex = state.qmIndex || 0;  // Resume Quick Mode where left off
     skippedItems = new Set(state.skippedItems||[]);
     if(state.globalNotes){
       const notesEl = document.getElementById('global-notes');
@@ -2532,7 +2538,9 @@ loadAll();
       <div style="font-size:16px;font-weight:700;">Quick Mode</div>
     </div>
     <div id="qm-sup-name" style="font-size:12px;color:var(--ink3);font-weight:600;margin-right:6px;"></div>
-    <button onclick="switchToListView()" style="padding:0 12px;height:32px;border-radius:999px;border:1.5px solid var(--line);background:var(--white);color:var(--ink2);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">☰ List</button>
+    <button onclick="switchToListView()" style="padding:0 12px;height:34px;border-radius:999px;border:1.5px solid var(--line);background:var(--white);color:var(--ink2);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:5px;">
+      📋 Tingnan Lahat
+    </button>
   </div>
   <!-- Progress -->
   <div style="padding:10px 16px;background:var(--white);border-bottom:1px solid var(--line);flex-shrink:0;">
