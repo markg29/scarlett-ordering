@@ -518,6 +518,10 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--surface);color:
     <div id="nav-title">OrderKo</div>
     <div id="nav-sub">Supplier Ordering System</div>
   </div>
+  <button id="qm-btn" onclick="startQuickMode()"
+    style="display:none;padding:0 12px;height:34px;border-radius:999px;border:none;background:var(--brand);color:#fff;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;">
+    ⚡ Quick
+  </button>
 </div>
 
 <!-- PAGE: HOME -->
@@ -598,6 +602,44 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--surface);color:
     <div class="fb-val" id="fb-val">₱0.00</div>
   </div>
   <div class="fb-btn">I-review ang Order →</div>
+</div>
+
+<!-- PAGE: QUICK MODE -->
+<div class="page" id="pg-quick">
+  <!-- Progress -->
+  <div id="qm-progress" style="padding:0 14px 12px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <div id="qm-counter" style="font-size:13px;font-weight:700;color:var(--ink2);">0 / 0</div>
+      <div id="qm-sup-name" style="font-size:12px;color:var(--ink3);font-weight:600;"></div>
+    </div>
+    <div style="height:5px;background:var(--line);border-radius:999px;overflow:hidden;">
+      <div id="qm-bar" style="height:100%;background:var(--brand);border-radius:999px;transition:width .3s;width:0%;"></div>
+    </div>
+  </div>
+
+  <!-- Card -->
+  <div id="qm-card-wrap" style="padding:0 14px;"></div>
+
+  <!-- Bottom Actions -->
+  <div style="position:sticky;bottom:calc(var(--TAB)+10px);padding:0 14px;display:flex;flex-direction:column;gap:8px;margin-top:16px;">
+    <div style="display:flex;gap:8px;align-items:center;">
+      <button class="qbtn" style="width:44px;height:44px;border-radius:12px;font-size:20px;" onclick="qmAdj(-1)">−</button>
+      <input id="qm-qty" type="number" inputmode="numeric" min="0" placeholder="0"
+        style="flex:1;text-align:center;font-size:28px;font-weight:800;border:2px solid var(--line);border-radius:14px;padding:10px;font-family:inherit;color:var(--ink);"
+        oninput="qmQtyInput(this.value)"/>
+      <button class="qbtn" style="width:44px;height:44px;border-radius:12px;font-size:20px;" onclick="qmAdj(1)">+</button>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button onclick="qmSkip()"
+        style="flex:1;height:48px;border-radius:14px;border:2px solid var(--danger);background:var(--white);color:var(--danger);font-size:14px;font-weight:700;cursor:pointer;">
+        ✕ Skip
+      </button>
+      <button onclick="qmNext()"
+        style="flex:2;height:48px;border-radius:14px;border:none;background:var(--brand);color:#fff;font-size:14px;font-weight:700;cursor:pointer;">
+        Susunod →
+      </button>
+    </div>
+  </div>
 </div>
 
 <!-- PAGE: REVIEW -->
@@ -907,6 +949,166 @@ function findStockByName(itemName){
 // ════════════════════════════════════════
 // LOAD
 // ════════════════════════════════════════
+// ════════════════════════════════════════
+// QUICK MODE
+// ════════════════════════════════════════
+let qmItems=[], qmIndex=0, qmCurrentQty=0;
+
+function startQuickMode(){
+  if(!activeSup){toast('Pumili muna ng supplier','err');return;}
+  qmItems=allItems.filter(i=>i.supplierId===activeSup.id);
+  if(!qmItems.length){toast('Walang items ang supplier na ito','err');return;}
+  qmIndex=0;
+  qmCurrentQty=0;
+  goPage('quick');
+  qmRender();
+}
+
+function qmRender(){
+  if(qmIndex>=qmItems.length){
+    // All done — go to items page for review
+    goPage('items');
+    renderItems();
+    updateCheckProgress();
+    toast('Quick Mode tapos na! I-review ang iyong cart.','ok');
+    return;
+  }
+
+  const item=qmItems[qmIndex];
+  const inCart=cart.find(c=>c.itemId===item.id);
+  const isSkipped=skippedItems.has(item.id);
+  qmCurrentQty=inCart?inCart.qty:0;
+
+  // Update progress
+  const pct=Math.round(qmIndex/qmItems.length*100);
+  document.getElementById('qm-counter').textContent=`${qmIndex+1} / ${qmItems.length}`;
+  document.getElementById('qm-sup-name').textContent=activeSup.name;
+  document.getElementById('qm-bar').style.width=pct+'%';
+
+  // Update qty input
+  const qtyEl=document.getElementById('qm-qty');
+  if(qtyEl){qtyEl.value=qmCurrentQty||'';qtyEl.style.borderColor=qmCurrentQty>0?'var(--ok)':'var(--line)';}
+
+  // Render card
+  const freq=(allOrders.filter(o=>o.supplierId===activeSup.id&&o.itemId===item.id)).length;
+  const stockInfo=findStockByName(item.name);
+  document.getElementById('qm-card-wrap').innerHTML=`
+    <div style="background:var(--white);border-radius:20px;padding:20px;box-shadow:0 2px 12px rgba(0,0,0,.08);">
+      ${item.imageUrl?`<img src="${item.imageUrl}" style="width:100%;height:160px;object-fit:contain;border-radius:12px;background:var(--surface);margin-bottom:16px;" onerror="this.style.display='none'"/>`:''}
+      <div style="font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">${item.category||'Item'}</div>
+      <div style="font-size:20px;font-weight:800;line-height:1.3;margin-bottom:12px;">${item.name}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+        ${item.unit?`<span style="background:var(--brandbg);color:var(--brand);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;">${item.unit}</span>`:''}
+        ${item.price>0?`<span style="background:var(--okbg);color:var(--ok);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;">₱${item.price.toFixed(2)}</span>`:''}
+        ${freq>=3?`<span style="background:#e65100;color:#fff;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;">🔥 Madalas</span>`:''}
+        ${stockInfo?`<span style="background:var(--surface);color:var(--ink3);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;">📦 ${stockInfo.quantity} Stocks</span>`:''}
+        ${item.maxOrder>0?`<span style="background:var(--warnbg);color:var(--warn);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;">MAX ${item.maxOrder}</span>`:''}
+      </div>
+      ${isSkipped?'<div style="background:var(--dangerbg);color:var(--danger);border-radius:10px;padding:8px 12px;font-size:12px;font-weight:700;">✕ Naka-skip na — mag-order ulit?</div>':''}
+      ${inCart&&!isSkipped?`<div style="background:var(--okbg);color:var(--ok);border-radius:10px;padding:8px 12px;font-size:12px;font-weight:700;">✓ ${inCart.qty} ${item.unit} na nasa cart</div>`:''}
+    </div>`;
+}
+
+function qmAdj(delta){
+  const item=qmItems[qmIndex];
+  const newQty=Math.max(0,qmCurrentQty+delta);
+  const maxQ=item.maxOrder>0?item.maxOrder:9999;
+  qmCurrentQty=Math.min(newQty,maxQ);
+  const el=document.getElementById('qm-qty');
+  if(el){el.value=qmCurrentQty||'';el.style.borderColor=qmCurrentQty>0?'var(--ok)':'var(--line)';}
+}
+
+function qmQtyInput(val){
+  const item=qmItems[qmIndex];
+  let qty=parseFloat(val)||0;
+  if(item.maxOrder>0)qty=Math.min(qty,item.maxOrder);
+  qmCurrentQty=qty;
+  const el=document.getElementById('qm-qty');
+  if(el)el.style.borderColor=qty>0?'var(--ok)':'var(--line)';
+}
+
+function qmNext(){
+  const item=qmItems[qmIndex];
+  // Remove from skip if it was skipped
+  skippedItems.delete(item.id);
+  // Update cart
+  const existing=cart.findIndex(c=>c.itemId===item.id);
+  if(qmCurrentQty>0){
+    const entry={itemId:item.id,name:item.name,unit:item.unit,price:item.price,qty:qmCurrentQty,notes:''};
+    if(existing>=0)cart[existing]=entry;
+    else cart.push(entry);
+  }else{
+    // qty=0 means skip
+    if(existing>=0)cart.splice(existing,1);
+    skippedItems.add(item.id);
+  }
+  saveCartState();
+  refreshFloat();
+  qmIndex++;
+  qmCurrentQty=0;
+  qmRender();
+}
+
+function qmSkip(){
+  const item=qmItems[qmIndex];
+  // Remove from cart if was there
+  const existing=cart.findIndex(c=>c.itemId===item.id);
+  if(existing>=0)cart.splice(existing,1);
+  skippedItems.add(item.id);
+  saveCartState();
+  refreshFloat();
+  qmIndex++;
+  qmCurrentQty=0;
+  qmRender();
+}
+
+// ════════════════════════════════════════
+// CART PERSISTENCE
+// ════════════════════════════════════════
+const CART_KEY = 'orderko_cart';
+
+function saveCartState(){
+  try{
+    localStorage.setItem(CART_KEY, JSON.stringify({
+      activeSup: activeSup,
+      cart: cart,
+      skippedItems: [...skippedItems],
+      globalNotes: document.getElementById('global-notes')?.value || ''
+    }));
+  }catch(e){}
+}
+
+function restoreCartState(){
+  try{
+    const saved = localStorage.getItem(CART_KEY);
+    if(!saved) return;
+    const state = JSON.parse(saved);
+    if(!state.activeSup || !state.cart?.length) return;
+
+    // Validate that the saved supplier and items still exist
+    const sup = suppliers.find(s=>s.id===state.activeSup.id);
+    if(!sup) return;
+
+    // Restore only cart items that still exist in allItems
+    const validCart = state.cart.filter(c=>allItems.find(i=>i.id===c.itemId));
+    if(!validCart.length) return;
+
+    activeSup = state.activeSup;
+    cart = validCart;
+    skippedItems = new Set(state.skippedItems||[]);
+    if(state.globalNotes){
+      const notesEl = document.getElementById('global-notes');
+      if(notesEl) notesEl.value = state.globalNotes;
+    }
+    refreshFloat();
+    toast('Na-restore ang cart 🛒','ok');
+  }catch(e){}
+}
+
+function clearCartState(){
+  try{ localStorage.removeItem(CART_KEY); }catch(e){}
+}
+
 async function loadAll(){
   toast('Naglo-load...','');
   try{
@@ -919,6 +1121,7 @@ async function loadAll(){
     allOrders=(d.orders||[]).map(r=>({orderId:String(r[0]||''),date:fmtDate(r[1]),supplierId:String(r[2]||''),supplierName:String(r[3]||''),itemId:String(r[4]||''),itemName:String(r[5]||''),qty:parseFloat(r[6])||0,unit:String(r[7]||''),price:parseFloat(r[8])||0,notes:String(r[9]||'')})).filter(o=>o.orderId);
     inventoryGoods=(dInv.goods||[]).map(r=>({id:String(r[0]||''),name:String(r[1]||''),quantity:parseFloat(r[4])||0,minStockQty:parseFloat(r[5])||0})).filter(g=>g.id&&g.name);
     renderHome();
+    restoreCartState(); // Restore cart if there was one before refresh
     toast('Na-load na ✅','ok');
   }catch(e){
     toast('❌ '+e.message,'err');
@@ -1225,6 +1428,7 @@ function autoQty(itemId,val){
     updateCartBadge(itemId,qty,true);
     refreshFloat();
     updateCheckProgress();
+    saveCartState();
   }
 }
 
@@ -1306,6 +1510,7 @@ function toggleSkip(itemId){
   }
   renderItemsSilent();
   updateCheckProgress();
+  saveCartState();
 }
 
 function updateCheckProgress(){
@@ -1453,6 +1658,7 @@ function showSuccess(){
 function newTxn(){
   cart=[];lastOrder=null;activeSup=null;
   skippedItems=new Set();
+  clearCartState();
   document.getElementById('global-notes').value='';
   document.getElementById('float-bar').classList.add('hide');
   // Reset scroll for home when starting fresh
@@ -2181,6 +2387,7 @@ const PCFG={
   home:    {title:'OrderKo',            sub:'Supplier Ordering System',back:false,tabs:true},
   products:{title:'Items',               sub:'Lahat ng produkto',       back:false,tabs:true},
   items:   {title:'Pumili ng Items',    sub:'',                       back:true, tabs:true},
+  quick:   {title:'Quick Mode',          sub:'',                       back:true, tabs:false},
   review:  {title:'I-review ang Order', sub:'',                       back:true, tabs:false},
   success: {title:'Order Saved!',       sub:'',                       back:false,tabs:false},
   history: {title:'History',            sub:'Mga nakaraang orders',   back:false,tabs:true},
@@ -2216,6 +2423,9 @@ function goTab(name){
 function goPage(name){
   // Pages use opacity to hide/show - scroll position is naturally preserved
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  // Show Quick Mode button only on items page
+  const qmBtn=document.getElementById('qm-btn');
+  if(qmBtn)qmBtn.style.display=name==='items'?'block':'none';
   document.getElementById('pg-'+name)?.classList.add('on');
 
   const c=PCFG[name]||{title:'',sub:'',back:false,tabs:true};
