@@ -3,6 +3,19 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<!-- Preconnect to Apps Script to reduce cold start latency -->
+<link rel="preconnect" href="https://script.google.com"/>
+<link rel="preconnect" href="https://script.googleusercontent.com"/>
+<!-- Early warmup ping — fires before CSS/JS loads -->
+<script>
+(function(){
+  try{
+    var API='https://script.google.com/macros/s/AKfycbzrKmEjPc8Xj6PRqnzkbukTk7rPoJrOgXKS1NZNT-_8oheJn_VxuxesJXpam2KrZLtF/exec';
+    // Fire and forget — just wakes up the Apps Script server
+    fetch(API+'?action=ping').catch(function(){});
+  }catch(e){}
+})();
+</script>
 <title>OrderKo</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
 <!-- PWA -->
@@ -2595,6 +2608,15 @@ setInterval(silentRefresh, 30000);
 // ════════════════════════════════════════
 // BOOT
 // ════════════════════════════════════════
+// Register Service Worker + warm up Apps Script in background
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('./sw-ordering.js')
+    .then(reg => {
+      // Send warmup message to SW if already active
+      if(reg.active) reg.active.postMessage('warmup');
+    })
+    .catch(()=>{});
+}
 loadAll();
 </script>
 <!-- QUICK MODE OVERLAY (full screen, not a .page) -->
@@ -2638,4 +2660,4 @@ loadAll();
 </div>
 
 </body>
-</html> 
+</html>
