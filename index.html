@@ -531,6 +531,11 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--surface);color:
     <div id="nav-title">OrderKo</div>
     <div id="nav-sub">Supplier Ordering System</div>
   </div>
+  <!-- Connection status -->
+  <div id="conn-status" style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
+    <div id="conn-dot" style="width:8px;height:8px;border-radius:50%;background:#f59e0b;transition:background .3s;"></div>
+    <span id="conn-label" style="font-size:10px;font-weight:700;color:var(--ink3);white-space:nowrap;">Checking...</span>
+  </div>
   <button id="qm-btn" onclick="startQuickMode()"
     style="display:none;padding:0 12px;height:34px;border-radius:999px;border:none;background:var(--brand);color:#fff;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;">
     ⚡ Quick Mode
@@ -884,19 +889,58 @@ let inventoryGoods=[]; // from Scarlett Inventory System (Goods sheet), matched 
 // ════════════════════════════════════════
 // API
 // ════════════════════════════════════════
-async function apiGet(p){
-  const r=await fetch(`${API}?${new URLSearchParams(p)}`);
-  if(!r.ok)throw new Error(`HTTP ${r.status}`);
-  const d=await r.json();
-  if(!d.ok)throw new Error(d.error||'Error');
-  return d;
+async function apiGet(p,_retry=0){
+  try{
+    const r=await fetch(`${API}?${new URLSearchParams(p)}`,{
+      redirect:'follow',cache:'no-store'
+    });
+    if(!r.ok){
+      if(_retry<2){
+        await new Promise(res=>setTimeout(res,1000));
+        return apiGet(p,_retry+1);
+      }
+      throw new Error(`HTTP ${r.status}`);
+    }
+    const d=await r.json();
+    if(!d.ok)throw new Error(d.error||'Error');
+    return d;
+  }catch(e){
+    if(_retry<2&&(e.name==='TypeError'||String(e).includes('fetch'))){
+      await new Promise(res=>setTimeout(res,1500));
+      return apiGet(p,_retry+1);
+    }
+    throw e;
+  }
 }
-async function apiPost(b){
-  const r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(b)});
-  if(!r.ok)throw new Error(`HTTP ${r.status}`);
-  const d=await r.json();
-  if(!d.ok)throw new Error(d.error||'Error');
-  return d;
+async function apiPost(b,_retry=0){
+  const controller=new AbortController();
+  const tid=setTimeout(()=>controller.abort(),30000);
+  try{
+    const r=await fetch(API,{
+      method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify(b),signal:controller.signal,
+      redirect:'follow',cache:'no-store'
+    });
+    clearTimeout(tid);
+    if(!r.ok){
+      if(_retry<1){
+        await new Promise(res=>setTimeout(res,1000));
+        return apiPost(b,_retry+1);
+      }
+      throw new Error(`HTTP ${r.status}`);
+    }
+    const d=await r.json();
+    if(!d.ok)throw new Error(d.error||'Error');
+    return d;
+  }catch(e){
+    clearTimeout(tid);
+    if(e.name==='AbortError')throw new Error('Timeout — baka nai-save na. I-refresh muna bago ulit mag-try.');
+    if(_retry<1&&(e.name==='TypeError'||String(e).includes('fetch'))){
+      await new Promise(res=>setTimeout(res,1500));
+      return apiPost(b,_retry+1);
+    }
+    throw e;
+  }
 }
 
 // ════════════════════════════════════════
@@ -1122,6 +1166,28 @@ function clearCartState(){
   try{ localStorage.removeItem(CART_KEY); }catch(e){}
 }
 
+// ════════════════════════════════════════
+// CONNECTION STATUS
+// ════════════════════════════════════════
+function setConnStatus(status){
+  const dot=document.getElementById('conn-dot');
+  const lbl=document.getElementById('conn-label');
+  if(!dot||!lbl)return;
+  if(status==='ok'){
+    dot.style.background='#22c55e';
+    lbl.textContent='Connected';
+    lbl.style.color='#22c55e';
+  }else if(status==='error'){
+    dot.style.background='#ef4444';
+    lbl.textContent='Offline';
+    lbl.style.color='#dc2626';
+  }else{
+    dot.style.background='#f59e0b';
+    lbl.textContent='Checking...';
+    lbl.style.color='var(--ink3)';
+  }
+}
+
 const CACHE_KEY = 'orderko_data_cache';
 
 function saveDataCache(d, dInv){
@@ -1169,12 +1235,15 @@ async function loadAll(){
     allItems=(d.items||[]).map(r=>({id:String(r[0]||''),supplierId:String(r[1]||''),name:String(r[2]||''),unit:String(r[3]||''),price:parseFloat(r[4])||0,maxOrder:r[5]!==''&&r[5]!==null&&r[5]!==undefined?parseInt(r[5])||0:0,imageUrl:String(r[6]||''),category:String(r[7]||'')})).filter(i=>i.id&&i.name);
     allOrders=(d.orders||[]).map(r=>({orderId:String(r[0]||''),date:fmtDate(r[1]),supplierId:String(r[2]||''),supplierName:String(r[3]||''),itemId:String(r[4]||''),itemName:String(r[5]||''),qty:parseFloat(r[6])||0,unit:String(r[7]||''),price:parseFloat(r[8])||0,notes:String(r[9]||'')})).filter(o=>o.orderId);
     inventoryGoods=(dInv.goods||[]).map(r=>({id:String(r[0]||''),name:String(r[1]||''),quantity:parseFloat(r[4])||0,minStockQty:parseFloat(r[5])||0})).filter(g=>g.id&&g.name);
+    setConnStatus('ok');
+    setConnStatus('ok');
     saveDataCache(d, dInv);
     renderHome();
     restoreCartState();
     if(activeSup) renderItems();
     if(!cached) toast('Na-load na ✅','ok');
   }catch(e){
+    setConnStatus('error');
     if(!cached){
       toast('❌ '+e.message,'err');
       document.getElementById('sup-scroll').innerHTML=`<div style="padding:16px 0;color:var(--danger);font-size:13px;padding-left:14px;">⚠️ Hindi ma-load. I-check ang internet.</div>`;
@@ -2600,7 +2669,8 @@ async function silentRefresh(){
     else if(curPage==='products')renderProducts();
     // Always update float bar in case cart restored
     refreshFloat();
-  }catch(e){}
+    setConnStatus('ok');
+  }catch(e){ setConnStatus('error'); }
 }
 // Refresh every 30 seconds silently
 setInterval(silentRefresh, 30000);
@@ -2660,4 +2730,4 @@ loadAll();
 </div>
 
 </body>
-</html> 
+</html>
