@@ -2617,13 +2617,15 @@ function goBack(){
 }
 
 function switchToListView(){
-  const ov=document.getElementById('qm-overlay');
-  if(ov)ov.style.display='none';
+  // Set items page active FIRST, then hide overlay
   renderItems();
   goPage('items');
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
   document.getElementById('tb-products')?.classList.add('on');
   refreshFloat();
+  // Hide overlay last so transition is smooth
+  const ov=document.getElementById('qm-overlay');
+  if(ov)ov.style.display='none';
 }
 
 function qmExit(){
