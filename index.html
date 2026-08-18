@@ -2239,16 +2239,66 @@ function runDelete(){if(pendingDelete){pendingDelete();pendingDelete=null;}}
 // EDIT ORDER
 // ════════════════════════════════════════
 let editOrderId=null,editOrderSupplierId=null,editOrderNewItems=[],editOrderChanges={};
-let editOrderDeletedItems=new Set(); // itemIds to delete from order
-let eqmItems=[], eqmIndex=0, eqmCurrentQty=0; // Edit Quick Mode state
 
 function openEditOrder(orderId){
   editOrderId=orderId;
   editOrderNewItems=[];
   editOrderChanges={};
-  editOrderDeletedItems=new Set();
+  const existing=allOrders.filter(r=>r.orderId===orderId);
+  if(!existing.length){toast('Order not found','err');return;}
+  const supplierId=existing[0].supplierId;
+  const supplierName=existing[0].supplierName;
+  editOrderSupplierId=supplierId;
+
+  document.getElementById('eo-info').innerHTML=
+    `<strong>${orderId}</strong> · ${supplierName}<br><span style="color:var(--ink3);font-size:12px;">${existing[0].date}</span>`;
+
+  // Existing items — editable qty
+  document.getElementById('eo-current-items').innerHTML=
+    `<div style="padding:8px 13px;font-size:11px;font-weight:700;color:var(--ink3);letter-spacing:.4px;text-transform:uppercase;border-bottom:1px solid var(--line);">Mga Existing Items</div>`+
+    existing.map((r,ri)=>{
+      const maxA=r.maxOrder>0?`max="${r.maxOrder}"`:'';
+      return `<div style="display:flex;align-items:center;gap:8px;padding:10px 13px;border-bottom:1px solid var(--line);">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:600;word-break:break-word;">${r.itemName}${r.unit?' <span style="color:var(--ink3);font-size:11px;">('+r.unit+')</span>':''}</div>
+          ${r.price>0?`<div style="font-size:11px;color:var(--ok);font-weight:700;">₱${r.price.toFixed(2)}</div>`:''}
+        </div>
+        <button class="qbtn" onclick="eoExAdj('${r.itemId}',${ri},-1)">−</button>
+        <input id="eoex-${r.itemId}" type="number" value="${r.qty}" min="0" inputmode="numeric"
+          style="width:34px;text-align:center;border:1.5px solid var(--line);border-radius:8px;padding:4px 2px;font-size:14px;font-weight:700;font-family:inherit;color:var(--ink);"
+          oninput="eoExQty('${r.itemId}',this.value,${r.qty})"/>
+        <button class="qbtn" onclick="eoExAdj('${r.itemId}',${ri},1)">+</button>
+      </div>`;
+    }).join('');
+
+  // Items to add from same supplier (not yet in order)
+  const existingItemIds=new Set(existing.map(r=>r.itemId));
+  const supplierItems=allItems.filter(i=>i.supplierId===supplierId&&!existingItemIds.has(i.id));
+
+  document.getElementById('eo-add-items').innerHTML=
+    `<div style="padding:8px 13px;font-size:11px;font-weight:700;color:var(--ink3);letter-spacing:.4px;text-transform:uppercase;border-bottom:1px solid var(--line);">Mag-add ng Bagong Items</div>`+
+    (!supplierItems.length
+      ? '<div style="padding:12px 13px;font-size:13px;color:var(--ink3);">Lahat ng items ay nandito na.</div>'
+      : supplierItems.map(item=>{
+          const maxA=item.maxOrder>0?`max="${item.maxOrder}"`:'';
+          return `<div style="display:flex;align-items:center;gap:8px;padding:10px 13px;border-bottom:1px solid var(--line);">
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:13px;font-weight:600;word-break:break-word;">${item.name}${item.unit?' <span style="color:var(--ink3);font-size:11px;">('+item.unit+')</span>':''}</div>
+              ${item.price>0?`<div style="font-size:11px;color:var(--ok);font-weight:700;">₱${item.price.toFixed(2)}</div>`:''}
+            </div>
+            <button class="qbtn" onclick="eoAdj('${item.id}',-1)">−</button>
+            <input id="eoqn-${item.id}" type="number" value="0" min="0" ${maxA} inputmode="numeric"
+              style="width:34px;text-align:center;border:1.5px solid var(--line);border-radius:8px;padding:4px 2px;font-size:14px;font-weight:700;font-family:inherit;"
+              oninput="eoQty('${item.id}',this.value)"/>
+            <button class="qbtn" onclick="eoAdj('${item.id}',1)">+</button>
+          </div>`;
+        }).join('')
+    );
+
+  openOverlay('mo-edit-order');
 }
-// eoEx helper functions (used by old modal, kept for compat)
+
+// Adjust existing item qty
 function eoExAdj(itemId,ri,d){
   const el=document.getElementById('eoex-'+itemId);
   if(!el)return;
@@ -2716,40 +2766,6 @@ loadOrderkoItemLinks();
     <div style="display:flex;gap:10px;">
       <button onclick="qmSkip()" style="flex:1;height:52px;border-radius:14px;border:2px solid var(--danger);background:var(--white);color:var(--danger);font-size:14px;font-weight:700;cursor:pointer;">✕ Skip</button>
       <button onclick="qmNext()" style="flex:2;height:52px;border-radius:14px;border:none;background:var(--brand);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">Susunod →</button>
-    </div>
-  </div>
-</div>
-
-<!-- EDIT ORDER QUICK MODE OVERLAY -->
-<div id="eqm-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:var(--surface);z-index:500;flex-direction:column;">
-  <div style="height:var(--NAV);background:var(--white);border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 14px;gap:10px;flex-shrink:0;">
-    <button onclick="eqmCancel()" style="width:34px;height:34px;border-radius:10px;border:none;background:var(--surface);font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>
-    <div style="flex:1;">
-      <div style="font-size:15px;font-weight:700;">I-edit ang Order</div>
-      <div id="eqm-order-id" style="font-size:11px;color:var(--ink3);"></div>
-    </div>
-    <div id="eqm-sup-name" style="font-size:12px;color:var(--ink3);font-weight:600;"></div>
-  </div>
-  <div style="padding:10px 16px;background:var(--white);border-bottom:1px solid var(--line);flex-shrink:0;">
-    <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
-      <div id="eqm-counter" style="font-size:13px;font-weight:700;color:var(--ink2);">0 / 0</div>
-    </div>
-    <div style="height:6px;background:var(--line);border-radius:999px;overflow:hidden;">
-      <div id="eqm-bar" style="height:100%;background:var(--brand);border-radius:999px;transition:width .3s;width:0%;"></div>
-    </div>
-  </div>
-  <div id="eqm-card-wrap" style="flex:1;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch;"></div>
-  <div id="eqm-controls" style="padding:14px 16px 28px;background:var(--white);border-top:1px solid var(--line);flex-shrink:0;">
-    <div style="display:flex;gap:10px;margin-bottom:10px;">
-      <button onclick="eqmAdj(-1)" style="width:64px;height:64px;border-radius:16px;border:2px solid var(--line);background:var(--surface);font-size:30px;font-weight:300;color:var(--brand);cursor:pointer;">−</button>
-      <input id="eqm-qty" type="number" inputmode="numeric" min="0" placeholder="0"
-        style="flex:1;text-align:center;font-size:36px;font-weight:800;border:2px solid var(--line);border-radius:16px;padding:8px;font-family:inherit;color:var(--ink);background:var(--white);min-width:0;"
-        oninput="eqmQtyInput(this.value)"/>
-      <button onclick="eqmAdj(1)" style="width:64px;height:64px;border-radius:16px;border:2px solid var(--line);background:var(--surface);font-size:30px;font-weight:300;color:var(--brand);cursor:pointer;">+</button>
-    </div>
-    <div style="display:flex;gap:10px;">
-      <button onclick="eqmDelete()" style="flex:1;height:52px;border-radius:14px;border:2px solid var(--danger);background:var(--white);color:var(--danger);font-size:13px;font-weight:700;cursor:pointer;">🗑 I-delete</button>
-      <button onclick="eqmNext()" style="flex:2;height:52px;border-radius:14px;border:none;background:var(--brand);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">Susunod →</button>
     </div>
   </div>
 </div>
