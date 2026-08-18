@@ -2239,11 +2239,205 @@ function runDelete(){if(pendingDelete){pendingDelete();pendingDelete=null;}}
 // EDIT ORDER
 // ════════════════════════════════════════
 let editOrderId=null,editOrderSupplierId=null,editOrderNewItems=[],editOrderChanges={};
+let editOrderDeletedItems=new Set(); // itemIds to delete from order
+let eqmItems=[], eqmIndex=0, eqmCurrentQty=0; // Edit Quick Mode state
 
 function openEditOrder(orderId){
   editOrderId=orderId;
   editOrderNewItems=[];
   editOrderChanges={};
+  editOrderDeletedItems=new Set();
+  const existing=allOrders.filter(r=>r.orderId===orderId);
+  if(!existing.length){toast('Order not found','err');return;}
+  editOrderSupplierId=existing[0].supplierId;
+
+  // Build eqmItems — all items in this order, card-by-card
+  eqmItems=existing.map(r=>({
+    itemId:r.itemId,
+    name:r.itemName,
+    unit:r.unit,
+    price:r.price,
+    origQty:r.qty,
+    currentQty:r.qty
+  }));
+  eqmIndex=0;
+  eqmCurrentQty=eqmItems[0]?.origQty||0;
+
+  // Show overlay
+  document.getElementById('eqm-order-id').textContent=orderId;
+  document.getElementById('eqm-sup-name').textContent=existing[0].supplierName;
+  const ov=document.getElementById('eqm-overlay');
+  if(ov)ov.style.display='flex';
+  eqmRender();
+}
+
+function eqmRender(){
+  const total=eqmItems.length;
+  if(eqmIndex>=total){
+    // Done reviewing — show summary and save
+    eqmShowSummary();
+    return;
+  }
+  const item=eqmItems[eqmIndex];
+  eqmCurrentQty=item.currentQty;
+
+  // Progress
+  const pct=Math.round(eqmIndex/total*100);
+  document.getElementById('eqm-counter').textContent=`${eqmIndex+1} / ${total}`;
+  document.getElementById('eqm-bar').style.width=pct+'%';
+
+  // Update qty input
+  const qtyEl=document.getElementById('eqm-qty');
+  if(qtyEl){
+    qtyEl.value=eqmCurrentQty||'';
+    qtyEl.style.borderColor=editOrderDeletedItems.has(item.itemId)?'var(--danger)':eqmCurrentQty>0?'var(--ok)':'var(--line)';
+  }
+
+  // Render card
+  const isDeleted=editOrderDeletedItems.has(item.itemId);
+  document.getElementById('eqm-card-wrap').innerHTML=`
+    <div style="background:var(--white);border-radius:20px;padding:20px;box-shadow:0 2px 12px rgba(0,0,0,.08);">
+      ${isDeleted?`<div style="background:var(--dangerbg);color:var(--danger);border-radius:10px;padding:8px 12px;font-size:12px;font-weight:800;margin-bottom:12px;">🗑 Ide-delete ang item na ito</div>`:''}
+      <div style="font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Item</div>
+      <div style="font-size:20px;font-weight:800;line-height:1.3;margin-bottom:12px;${isDeleted?'text-decoration:line-through;color:var(--ink3);':''}">${item.name}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+        ${item.unit?`<span style="background:var(--brandbg);color:var(--brand);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;">${item.unit}</span>`:''}
+        ${item.price>0?`<span style="background:var(--okbg,#f0fdf4);color:var(--ok);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;">₱${item.price.toFixed(2)}</span>`:''}
+      </div>
+      <div style="font-size:12px;color:var(--ink3);">Dati: <strong>${item.origQty} ${item.unit}</strong></div>
+    </div>`;
+}
+
+function eqmAdj(delta){
+  if(editOrderDeletedItems.has(eqmItems[eqmIndex]?.itemId)) return;
+  eqmCurrentQty=Math.max(0,eqmCurrentQty+delta);
+  const el=document.getElementById('eqm-qty');
+  if(el){el.value=eqmCurrentQty||'';el.style.borderColor=eqmCurrentQty>0?'var(--ok)':'var(--line)';}
+}
+
+function eqmQtyInput(val){
+  if(editOrderDeletedItems.has(eqmItems[eqmIndex]?.itemId)) return;
+  eqmCurrentQty=Math.max(0,parseFloat(val)||0);
+  const el=document.getElementById('eqm-qty');
+  if(el)el.style.borderColor=eqmCurrentQty>0?'var(--ok)':'var(--line)';
+}
+
+function eqmDelete(){
+  const item=eqmItems[eqmIndex];
+  if(!item)return;
+  if(editOrderDeletedItems.has(item.itemId)){
+    // Undo delete
+    editOrderDeletedItems.delete(item.itemId);
+    item.currentQty=item.origQty;
+  }else{
+    editOrderDeletedItems.add(item.itemId);
+    item.currentQty=0;
+  }
+  eqmCurrentQty=item.currentQty;
+  eqmRender();
+}
+
+function eqmNext(){
+  const item=eqmItems[eqmIndex];
+  if(!item)return;
+  if(!editOrderDeletedItems.has(item.itemId)){
+    if(eqmCurrentQty<=0){
+      // Confirm: delete or go back
+      const existing=document.getElementById('eqm-zero-confirm');
+      if(existing)existing.remove();
+      document.getElementById('eqm-card-wrap').innerHTML+=`
+        <div id="eqm-zero-confirm" style="margin-top:10px;background:var(--warnbg);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;">
+          <div style="font-size:13px;font-weight:700;color:var(--warn);">⚠️ 0 ang qty. I-delete ba ang item na ito?</div>
+          <div style="display:flex;gap:8px;">
+            <button onclick="eqmConfirmDelete()" style="flex:1;height:40px;border-radius:10px;border:none;background:var(--danger);color:#fff;font-size:13px;font-weight:700;cursor:pointer;">🗑 I-delete</button>
+            <button onclick="document.getElementById('eqm-zero-confirm')?.remove();document.getElementById('eqm-qty').focus();" style="flex:1;height:40px;border-radius:10px;border:2px solid var(--line);background:var(--white);color:var(--ink2);font-size:13px;font-weight:700;cursor:pointer;">↩ Mag-lagay ng Qty</button>
+          </div>
+        </div>`;
+      return;
+    }
+    item.currentQty=eqmCurrentQty;
+    if(eqmCurrentQty!==item.origQty) editOrderChanges[item.itemId]=eqmCurrentQty;
+    else delete editOrderChanges[item.itemId];
+  }
+  eqmIndex++;
+  eqmCurrentQty=eqmItems[eqmIndex]?.currentQty||eqmItems[eqmIndex]?.origQty||0;
+  eqmRender();
+}
+
+function eqmConfirmDelete(){
+  const item=eqmItems[eqmIndex];
+  if(!item)return;
+  editOrderDeletedItems.add(item.itemId);
+  item.currentQty=0;
+  delete editOrderChanges[item.itemId];
+  eqmIndex++;
+  eqmCurrentQty=eqmItems[eqmIndex]?.origQty||0;
+  eqmRender();
+}
+
+function eqmShowSummary(){
+  const changes=Object.keys(editOrderChanges).length;
+  const deletes=editOrderDeletedItems.size;
+  document.getElementById('eqm-counter').textContent='Tapos!';
+  document.getElementById('eqm-bar').style.width='100%';
+  document.getElementById('eqm-bar').style.background='var(--ok)';
+
+  const summaryLines=[];
+  if(changes) summaryLines.push(`${changes} item${changes!==1?'s':''} na-update ang qty`);
+  if(deletes) summaryLines.push(`${deletes} item${deletes!==1?'s':''} ide-delete`);
+
+  document.getElementById('eqm-card-wrap').innerHTML=`
+    <div style="background:var(--white);border-radius:20px;padding:24px;text-align:center;">
+      <div style="font-size:48px;margin-bottom:12px;">${changes||deletes?'✏️':'✅'}</div>
+      <div style="font-size:18px;font-weight:800;margin-bottom:8px;">${changes||deletes?'I-save ang mga pagbabago?':'Walang pagbabago'}</div>
+      ${summaryLines.map(l=>`<div style="font-size:13px;color:var(--ink3);margin-bottom:4px;">${l}</div>`).join('')}
+    </div>`;
+
+  // Change bottom buttons to Save/Cancel
+  document.getElementById('eqm-controls').innerHTML=`
+    <div style="display:flex;gap:10px;">
+      <button onclick="eqmCancel()" style="flex:1;height:52px;border-radius:14px;border:1.5px solid var(--line);background:var(--white);color:var(--ink2);font-size:14px;font-weight:700;cursor:pointer;">Kanselahin</button>
+      ${changes||deletes?`<button onclick="eqmSave()" style="flex:2;height:52px;border-radius:14px;border:none;background:var(--brand);color:#fff;font-size:15px;font-weight:700;cursor:pointer;" id="eqm-save-btn">💾 I-save</button>`:'<button onclick="eqmCancel()" style="flex:2;height:52px;border-radius:14px;border:none;background:var(--ok);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">✓ Okay</button>'}
+    </div>`;
+}
+
+function eqmCancel(){
+  const ov=document.getElementById('eqm-overlay');
+  if(ov)ov.style.display='none';
+  editOrderChanges={};
+  editOrderDeletedItems=new Set();
+  editOrderNewItems=[];
+}
+
+async function eqmSave(){
+  const btn=document.getElementById('eqm-save-btn');
+  if(btn){btn.disabled=true;btn.textContent='Nag-se-save...';}
+  try{
+    if(Object.keys(editOrderChanges).length){
+      await apiPost({action:'updateOrderItems',orderId:editOrderId,changes:editOrderChanges});
+      Object.entries(editOrderChanges).forEach(([itemId,newQty])=>{
+        const row=allOrders.find(r=>r.orderId===editOrderId&&r.itemId===itemId);
+        if(row)row.qty=newQty;
+      });
+    }
+    if(editOrderDeletedItems.size){
+      await apiPost({action:'deleteOrderItems',orderId:editOrderId,itemIds:[...editOrderDeletedItems]});
+      // Remove from local allOrders
+      const before=allOrders.length;
+      allOrders=allOrders.filter(r=>!(r.orderId===editOrderId&&editOrderDeletedItems.has(r.itemId)));
+    }
+    const ov=document.getElementById('eqm-overlay');
+    if(ov)ov.style.display='none';
+    renderHistory();
+    renderHome();
+    showSaveSuccess('Order na-update!');
+    editOrderChanges={};
+    editOrderDeletedItems=new Set();
+  }catch(e){
+    toast('❌ '+e.message,'err');
+    if(btn){btn.disabled=false;btn.textContent='💾 I-save';}
+  }
+}
   const existing=allOrders.filter(r=>r.orderId===orderId);
   if(!existing.length){toast('Order not found','err');return;}
   const supplierId=existing[0].supplierId;
@@ -2295,10 +2489,7 @@ function openEditOrder(orderId){
         }).join('')
     );
 
-  openOverlay('mo-edit-order');
-}
-
-// Adjust existing item qty
+// (old eoEx functions kept for compatibility - not used in QM mode)
 function eoExAdj(itemId,ri,d){
   const el=document.getElementById('eoex-'+itemId);
   if(!el)return;
@@ -2766,6 +2957,40 @@ loadOrderkoItemLinks();
     <div style="display:flex;gap:10px;">
       <button onclick="qmSkip()" style="flex:1;height:52px;border-radius:14px;border:2px solid var(--danger);background:var(--white);color:var(--danger);font-size:14px;font-weight:700;cursor:pointer;">✕ Skip</button>
       <button onclick="qmNext()" style="flex:2;height:52px;border-radius:14px;border:none;background:var(--brand);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">Susunod →</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT ORDER QUICK MODE OVERLAY -->
+<div id="eqm-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:var(--surface);z-index:500;flex-direction:column;">
+  <div style="height:var(--NAV);background:var(--white);border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 14px;gap:10px;flex-shrink:0;">
+    <button onclick="eqmCancel()" style="width:34px;height:34px;border-radius:10px;border:none;background:var(--surface);font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>
+    <div style="flex:1;">
+      <div style="font-size:15px;font-weight:700;">I-edit ang Order</div>
+      <div id="eqm-order-id" style="font-size:11px;color:var(--ink3);"></div>
+    </div>
+    <div id="eqm-sup-name" style="font-size:12px;color:var(--ink3);font-weight:600;"></div>
+  </div>
+  <div style="padding:10px 16px;background:var(--white);border-bottom:1px solid var(--line);flex-shrink:0;">
+    <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+      <div id="eqm-counter" style="font-size:13px;font-weight:700;color:var(--ink2);">0 / 0</div>
+    </div>
+    <div style="height:6px;background:var(--line);border-radius:999px;overflow:hidden;">
+      <div id="eqm-bar" style="height:100%;background:var(--brand);border-radius:999px;transition:width .3s;width:0%;"></div>
+    </div>
+  </div>
+  <div id="eqm-card-wrap" style="flex:1;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch;"></div>
+  <div id="eqm-controls" style="padding:14px 16px 28px;background:var(--white);border-top:1px solid var(--line);flex-shrink:0;">
+    <div style="display:flex;gap:10px;margin-bottom:10px;">
+      <button onclick="eqmAdj(-1)" style="width:64px;height:64px;border-radius:16px;border:2px solid var(--line);background:var(--surface);font-size:30px;font-weight:300;color:var(--brand);cursor:pointer;">−</button>
+      <input id="eqm-qty" type="number" inputmode="numeric" min="0" placeholder="0"
+        style="flex:1;text-align:center;font-size:36px;font-weight:800;border:2px solid var(--line);border-radius:16px;padding:8px;font-family:inherit;color:var(--ink);background:var(--white);min-width:0;"
+        oninput="eqmQtyInput(this.value)"/>
+      <button onclick="eqmAdj(1)" style="width:64px;height:64px;border-radius:16px;border:2px solid var(--line);background:var(--surface);font-size:30px;font-weight:300;color:var(--brand);cursor:pointer;">+</button>
+    </div>
+    <div style="display:flex;gap:10px;">
+      <button onclick="eqmDelete()" style="flex:1;height:52px;border-radius:14px;border:2px solid var(--danger);background:var(--white);color:var(--danger);font-size:13px;font-weight:700;cursor:pointer;">🗑 I-delete</button>
+      <button onclick="eqmNext()" style="flex:2;height:52px;border-radius:14px;border:none;background:var(--brand);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">Susunod →</button>
     </div>
   </div>
 </div>
