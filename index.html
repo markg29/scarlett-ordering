@@ -2241,17 +2241,27 @@ function openEditOrder(orderId){
   if(!existing.length){toast('Order not found','err');return;}
   editOrderSupplierId=existing[0].supplierId;
 
-  // Build eqmItems — all items in this order, card-by-card
-  eqmItems=existing.map(r=>({
-    itemId:r.itemId,
-    name:r.itemName,
-    unit:r.unit,
-    price:r.price,
-    origQty:r.qty,
-    currentQty:r.qty
-  }));
+  // Build a map of items already in the order
+  const inOrderMap={};
+  existing.forEach(r=>inOrderMap[r.itemId]={
+    itemId:r.itemId, name:r.itemName, unit:r.unit,
+    price:r.price, origQty:r.qty, currentQty:r.qty, isExisting:true
+  });
+
+  // All supplier items — existing order items first, then new items
+  const supplierItems=allItems.filter(i=>i.supplierId===editOrderSupplierId);
+  eqmItems=[
+    // Existing items first (already in order)
+    ...supplierItems.filter(i=>inOrderMap[i.id]).map(i=>inOrderMap[i.id]),
+    // Then items not yet in order
+    ...supplierItems.filter(i=>!inOrderMap[i.id]).map(i=>({
+      itemId:i.id, name:i.name, unit:i.unit,
+      price:i.price, origQty:0, currentQty:0, isExisting:false
+    }))
+  ];
+
   eqmIndex=0;
-  eqmCurrentQty=eqmItems[0]?.origQty||0;
+  eqmCurrentQty=eqmItems[0]?.currentQty||0;
 
   // Show eqm-overlay
   document.getElementById('eqm-order-id').textContent=orderId;
@@ -2295,17 +2305,25 @@ function eqmRender(){
   }
 
   const isDeleted=editOrderDeletedItems.has(item.itemId);
+  const isNew=!item.isExisting;
   document.getElementById('eqm-card-wrap').innerHTML=`
     <div style="background:var(--white);border-radius:20px;padding:20px;box-shadow:0 2px 12px rgba(0,0,0,.08);">
       ${isDeleted?`<div style="background:var(--dangerbg);color:var(--danger);border-radius:10px;padding:8px 12px;font-size:12px;font-weight:800;margin-bottom:12px;">🗑 Ide-delete ang item na ito</div>`:''}
+      ${isNew?`<div style="background:var(--brandbg);color:var(--brand);border-radius:10px;padding:6px 12px;font-size:11px;font-weight:800;margin-bottom:12px;">✨ Bagong item — hindi pa nasa order</div>`
+             :`<div style="background:#f0fdf4;color:var(--ok);border-radius:10px;padding:6px 12px;font-size:11px;font-weight:800;margin-bottom:12px;">✓ Nasa order na — Dati: ${item.origQty} ${item.unit}</div>`}
       <div style="font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Item</div>
       <div style="font-size:20px;font-weight:800;line-height:1.3;margin-bottom:12px;${isDeleted?'text-decoration:line-through;color:var(--ink3);':''}">${item.name}</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
         ${item.unit?`<span style="background:var(--brandbg);color:var(--brand);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;">${item.unit}</span>`:''}
         ${item.price>0?`<span style="background:#f0fdf4;color:var(--ok);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;">₱${item.price.toFixed(2)}</span>`:''}
       </div>
-      <div style="font-size:12px;color:var(--ink3);">Dati: <strong>${item.origQty} ${item.unit}</strong></div>
     </div>`;
+  // Show delete button only for existing items
+  const delBtn=document.getElementById('eqm-del-btn');
+  if(delBtn){
+    delBtn.style.display=item.isExisting?'':'none';
+    delBtn.textContent=editOrderDeletedItems.has(item.itemId)?'↩ I-undo':'🗑 I-delete';
+  }
 }
 
 function eqmAdj(delta){
@@ -2324,7 +2342,7 @@ function eqmQtyInput(val){
 
 function eqmDelete(){
   const item=eqmItems[eqmIndex];
-  if(!item)return;
+  if(!item||!item.isExisting) return; // Can't delete new items
   if(editOrderDeletedItems.has(item.itemId)){
     editOrderDeletedItems.delete(item.itemId);
     item.currentQty=item.origQty;
@@ -2341,6 +2359,14 @@ function eqmNext(){
   if(!item)return;
   if(!editOrderDeletedItems.has(item.itemId)){
     if(eqmCurrentQty<=0){
+      // New items with 0 qty = just skip, existing with 0 = ask to delete
+      if(!item.isExisting){
+        // Skip new item silently
+        eqmIndex++;
+        eqmCurrentQty=eqmItems[eqmIndex]?.currentQty||0;
+        eqmRender();
+        return;
+      }
       const existing=document.getElementById('eqm-zero-confirm');
       if(existing)existing.remove();
       document.getElementById('eqm-card-wrap').innerHTML+=`
@@ -2354,8 +2380,15 @@ function eqmNext(){
       return;
     }
     item.currentQty=eqmCurrentQty;
-    if(eqmCurrentQty!==item.origQty) editOrderChanges[item.itemId]=eqmCurrentQty;
-    else delete editOrderChanges[item.itemId];
+    if(item.isExisting){
+      // Existing item qty change
+      if(eqmCurrentQty!==item.origQty) editOrderChanges[item.itemId]=eqmCurrentQty;
+      else delete editOrderChanges[item.itemId];
+    }else{
+      // New item to add to order
+      editOrderNewItems=editOrderNewItems.filter(n=>n.itemId!==item.itemId);
+      editOrderNewItems.push({itemId:item.itemId,name:item.name,unit:item.unit,price:item.price,qty:eqmCurrentQty});
+    }
   }
   eqmIndex++;
   eqmCurrentQty=eqmItems[eqmIndex]?.currentQty||eqmItems[eqmIndex]?.origQty||0;
@@ -2376,22 +2409,24 @@ function eqmConfirmDelete(){
 function eqmShowSummary(){
   const changes=Object.keys(editOrderChanges).length;
   const deletes=editOrderDeletedItems.size;
+  const newItems=editOrderNewItems.length;
   document.getElementById('eqm-counter').textContent='Tapos!';
   document.getElementById('eqm-bar').style.width='100%';
   document.getElementById('eqm-bar').style.background='var(--ok)';
 
   document.getElementById('eqm-card-wrap').innerHTML=`
     <div style="background:var(--white);border-radius:20px;padding:24px;text-align:center;">
-      <div style="font-size:48px;margin-bottom:12px;">${changes||deletes?'✏️':'✅'}</div>
-      <div style="font-size:18px;font-weight:800;margin-bottom:8px;">${changes||deletes?'I-save ang mga pagbabago?':'Walang pagbabago'}</div>
+      <div style="font-size:48px;margin-bottom:12px;">${changes||deletes||newItems?'✏️':'✅'}</div>
+      <div style="font-size:18px;font-weight:800;margin-bottom:8px;">${changes||deletes||newItems?'I-save ang mga pagbabago?':'Walang pagbabago'}</div>
       ${changes?`<div style="font-size:13px;color:var(--ink3);margin-bottom:4px;">${changes} item${changes!==1?'s':''} na-update ang qty</div>`:''}
       ${deletes?`<div style="font-size:13px;color:var(--danger);margin-bottom:4px;">🗑 ${deletes} item${deletes!==1?'s':''} ide-delete</div>`:''}
+      ${newItems?`<div style="font-size:13px;color:var(--brand);margin-bottom:4px;">✨ ${newItems} bagong item${newItems!==1?'s':''} idadagdag</div>`:''}
     </div>`;
 
   document.getElementById('eqm-controls').innerHTML=`
     <div style="display:flex;gap:10px;">
       <button onclick="eqmCancel()" style="flex:1;height:52px;border-radius:14px;border:1.5px solid var(--line);background:var(--white);color:var(--ink2);font-size:14px;font-weight:700;cursor:pointer;">Kanselahin</button>
-      ${changes||deletes
+      ${changes||deletes||newItems
         ?`<button onclick="eqmSave()" id="eqm-save-btn" style="flex:2;height:52px;border-radius:14px;border:none;background:var(--brand);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">💾 I-save</button>`
         :`<button onclick="eqmCancel()" style="flex:2;height:52px;border-radius:14px;border:none;background:var(--ok);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">✓ Okay</button>`}
     </div>`;
@@ -2420,6 +2455,19 @@ async function eqmSave(){
       await apiPost({action:'deleteOrderItems',orderId:editOrderId,itemIds:[...editOrderDeletedItems]});
       allOrders=allOrders.filter(r=>!(r.orderId===editOrderId&&editOrderDeletedItems.has(r.itemId)));
     }
+    if(editOrderNewItems.length){
+      // Get order date and supplier from existing order
+      const existingRow=allOrders.find(r=>r.orderId===editOrderId);
+      const rows=editOrderNewItems.map(n=>[
+        editOrderId, existingRow?.date||'', existingRow?.supplierId||'',
+        existingRow?.supplierName||'', n.itemId, n.name, n.qty, n.unit, n.price, ''
+      ]);
+      await apiPost({action:'addOrderItems',orderId:editOrderId,rows});
+      rows.forEach(r=>allOrders.push({
+        orderId:r[0],date:r[1],supplierId:r[2],supplierName:r[3],
+        itemId:r[4],itemName:r[5],qty:r[6],unit:r[7],price:r[8],notes:r[9]
+      }));
+    }
     const ov=document.getElementById('eqm-overlay');
     if(ov)ov.style.display='none';
     renderHistory();
@@ -2427,6 +2475,7 @@ async function eqmSave(){
     showSaveSuccess('Order na-update!');
     editOrderChanges={};
     editOrderDeletedItems=new Set();
+    editOrderNewItems=[];
   }catch(e){
     toast('❌ '+e.message,'err');
     if(btn){btn.disabled=false;btn.textContent='💾 I-save';}
