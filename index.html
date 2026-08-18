@@ -596,7 +596,6 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--surface);color:
   <div id="check-bar" style="display:none;position:sticky;top:0;z-index:10;background:var(--white);border-bottom:1px solid var(--line);padding:10px 14px;margin-bottom:6px;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
       <div id="check-bar-text" style="font-size:12px;font-weight:700;color:var(--ink2);">0 / 0 na-check</div>
-      <button onclick="skipAllRemaining()" style="font-size:11px;font-weight:700;color:var(--ink3);background:none;border:none;cursor:pointer;padding:2px 6px;">Skip lahat ✕</button>
     </div>
     <div style="height:6px;background:var(--line);border-radius:999px;overflow:hidden;">
       <div id="check-bar-fill" style="height:100%;background:var(--ok);border-radius:999px;transition:width .3s;width:0%;"></div>
@@ -1047,6 +1046,10 @@ function qmRender(){
   const isSkipped=skippedItems.has(item.id);
   qmCurrentQty=inCart?inCart.qty:0;
 
+  // Show back button only if not on first item
+  const backBtn=document.getElementById('qm-back-btn');
+  if(backBtn) backBtn.style.display=qmIndex>0?'block':'none';
+
   // Update progress
   const pct=Math.round(qmIndex/qmItems.length*100);
   document.getElementById('qm-counter').textContent=`${qmIndex+1} / ${qmItems.length}`;
@@ -1143,6 +1146,23 @@ function qmDismissConfirm(){
   if(el)el.remove();
   document.getElementById('qm-qty')?.focus();
 }
+
+function qmBack(){
+  if(qmIndex<=0) return;
+  qmIndex--;
+  const item=qmItems[qmIndex];
+  // Restore previous state - remove from cart or unskip
+  const prevInCart=cart.findIndex(c=>c.itemId===item.id);
+  if(prevInCart>=0){
+    qmCurrentQty=cart[prevInCart].qty;
+  }else if(skippedItems.has(item.id)){
+    qmCurrentQty=0;
+  }else{
+    qmCurrentQty=0;
+  }
+  qmRender();
+}
+
 
 function qmSkip(){
   const item=qmItems[qmIndex];
@@ -1396,11 +1416,12 @@ function doSwitchSupplier(id,name){
   activeSup={id,name};
   cart=[];
   skippedItems=new Set();
+  qmIndex=0;
+  clearCartState(); // Clear previous supplier's cart
   const itemsEl=document.getElementById('pg-items');
   if(itemsEl)itemsEl.scrollTop=0;
   renderHome();
   renderItems();
-  // Default: open Quick Mode directly
   startQuickMode();
 }
 
@@ -1679,39 +1700,6 @@ function updateCheckProgress(){
   }
 }
 
-let _prevSkippedItems = null; // For undo skip all
-
-function skipAllRemaining(){
-  // Save current state for undo
-  _prevSkippedItems = new Set(skippedItems);
-
-  const myItems=allItems.filter(i=>i.supplierId===activeSup?.id);
-  const checkedCart=new Set(cart.map(c=>c.itemId));
-  myItems.forEach(i=>{
-    if(!checkedCart.has(i.id)&&!skippedItems.has(i.id)){
-      skippedItems.add(i.id);
-    }
-  });
-  renderItemsSilent();
-  updateCheckProgress();
-  // Show undo toast
-  const el=document.getElementById('toast');
-  el.innerHTML='Lahat naskip &nbsp;<button onclick="undoSkipAll()" style="background:rgba(255,255,255,.25);border:none;border-radius:6px;color:#fff;font-weight:800;padding:2px 8px;cursor:pointer;font-size:12px;">↩ I-undo</button>';
-  el.className='on';
-  clearTimeout(_tt);
-  _tt=setTimeout(()=>{el.className='';el.textContent='';},5000);
-}
-
-function undoSkipAll(){
-  if(_prevSkippedItems===null) return;
-  skippedItems=_prevSkippedItems;
-  _prevSkippedItems=null;
-  renderItemsSilent();
-  updateCheckProgress();
-  saveCartState();
-  toast('Na-undo ang Skip Lahat ✓','ok');
-}
-
 function goToReview(){
   if(!cart.length){toast('Wala pang items!','err');return;}
   // Check if all items are checked (carted or skipped)
@@ -1789,6 +1777,7 @@ async function saveOrder(){
     rows.forEach(r=>allOrders.push({orderId:r[0],date:r[1],supplierId:r[2],supplierName:r[3],itemId:r[4],itemName:r[5],qty:r[6],unit:r[7],price:r[8],notes:r[9]}));
     const total=cart.reduce((s,c)=>s+c.price*c.qty,0);
     lastOrder={orderId,date:dateStr,supplier:{...activeSup},items:[...cart],notes:gNotes,total};
+    cart=[];skippedItems=new Set();clearCartState(); // Clear immediately after save
     showSuccess();
   }catch(e){
     toast('❌ Hindi na-save: '+e.message,'err');
@@ -2239,66 +2228,212 @@ function runDelete(){if(pendingDelete){pendingDelete();pendingDelete=null;}}
 // EDIT ORDER
 // ════════════════════════════════════════
 let editOrderId=null,editOrderSupplierId=null,editOrderNewItems=[],editOrderChanges={};
+let editOrderDeletedItems=new Set(); // itemIds to delete from order
+let eqmItems=[], eqmIndex=0, eqmCurrentQty=0; // Edit Quick Mode state
 
 function openEditOrder(orderId){
   editOrderId=orderId;
   editOrderNewItems=[];
   editOrderChanges={};
+  editOrderDeletedItems=new Set();
+
   const existing=allOrders.filter(r=>r.orderId===orderId);
   if(!existing.length){toast('Order not found','err');return;}
-  const supplierId=existing[0].supplierId;
-  const supplierName=existing[0].supplierName;
-  editOrderSupplierId=supplierId;
+  editOrderSupplierId=existing[0].supplierId;
 
-  document.getElementById('eo-info').innerHTML=
-    `<strong>${orderId}</strong> · ${supplierName}<br><span style="color:var(--ink3);font-size:12px;">${existing[0].date}</span>`;
+  // Build eqmItems — all items in this order, card-by-card
+  eqmItems=existing.map(r=>({
+    itemId:r.itemId,
+    name:r.itemName,
+    unit:r.unit,
+    price:r.price,
+    origQty:r.qty,
+    currentQty:r.qty
+  }));
+  eqmIndex=0;
+  eqmCurrentQty=eqmItems[0]?.origQty||0;
 
-  // Existing items — editable qty
-  document.getElementById('eo-current-items').innerHTML=
-    `<div style="padding:8px 13px;font-size:11px;font-weight:700;color:var(--ink3);letter-spacing:.4px;text-transform:uppercase;border-bottom:1px solid var(--line);">Mga Existing Items</div>`+
-    existing.map((r,ri)=>{
-      const maxA=r.maxOrder>0?`max="${r.maxOrder}"`:'';
-      return `<div style="display:flex;align-items:center;gap:8px;padding:10px 13px;border-bottom:1px solid var(--line);">
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:13px;font-weight:600;word-break:break-word;">${r.itemName}${r.unit?' <span style="color:var(--ink3);font-size:11px;">('+r.unit+')</span>':''}</div>
-          ${r.price>0?`<div style="font-size:11px;color:var(--ok);font-weight:700;">₱${r.price.toFixed(2)}</div>`:''}
-        </div>
-        <button class="qbtn" onclick="eoExAdj('${r.itemId}',${ri},-1)">−</button>
-        <input id="eoex-${r.itemId}" type="number" value="${r.qty}" min="0" inputmode="numeric"
-          style="width:34px;text-align:center;border:1.5px solid var(--line);border-radius:8px;padding:4px 2px;font-size:14px;font-weight:700;font-family:inherit;color:var(--ink);"
-          oninput="eoExQty('${r.itemId}',this.value,${r.qty})"/>
-        <button class="qbtn" onclick="eoExAdj('${r.itemId}',${ri},1)">+</button>
-      </div>`;
-    }).join('');
-
-  // Items to add from same supplier (not yet in order)
-  const existingItemIds=new Set(existing.map(r=>r.itemId));
-  const supplierItems=allItems.filter(i=>i.supplierId===supplierId&&!existingItemIds.has(i.id));
-
-  document.getElementById('eo-add-items').innerHTML=
-    `<div style="padding:8px 13px;font-size:11px;font-weight:700;color:var(--ink3);letter-spacing:.4px;text-transform:uppercase;border-bottom:1px solid var(--line);">Mag-add ng Bagong Items</div>`+
-    (!supplierItems.length
-      ? '<div style="padding:12px 13px;font-size:13px;color:var(--ink3);">Lahat ng items ay nandito na.</div>'
-      : supplierItems.map(item=>{
-          const maxA=item.maxOrder>0?`max="${item.maxOrder}"`:'';
-          return `<div style="display:flex;align-items:center;gap:8px;padding:10px 13px;border-bottom:1px solid var(--line);">
-            <div style="flex:1;min-width:0;">
-              <div style="font-size:13px;font-weight:600;word-break:break-word;">${item.name}${item.unit?' <span style="color:var(--ink3);font-size:11px;">('+item.unit+')</span>':''}</div>
-              ${item.price>0?`<div style="font-size:11px;color:var(--ok);font-weight:700;">₱${item.price.toFixed(2)}</div>`:''}
-            </div>
-            <button class="qbtn" onclick="eoAdj('${item.id}',-1)">−</button>
-            <input id="eoqn-${item.id}" type="number" value="0" min="0" ${maxA} inputmode="numeric"
-              style="width:34px;text-align:center;border:1.5px solid var(--line);border-radius:8px;padding:4px 2px;font-size:14px;font-weight:700;font-family:inherit;"
-              oninput="eoQty('${item.id}',this.value)"/>
-            <button class="qbtn" onclick="eoAdj('${item.id}',1)">+</button>
-          </div>`;
-        }).join('')
-    );
-
-  openOverlay('mo-edit-order');
+  // Show eqm-overlay
+  document.getElementById('eqm-order-id').textContent=orderId;
+  document.getElementById('eqm-sup-name').textContent=existing[0].supplierName;
+  // Reset controls to default (in case previous edit was at summary screen)
+  document.getElementById('eqm-controls').innerHTML=`
+    <div style="display:flex;gap:10px;margin-bottom:10px;">
+      <button onclick="eqmAdj(-1)" style="width:64px;height:64px;border-radius:16px;border:2px solid var(--line);background:var(--surface);font-size:30px;font-weight:300;color:var(--brand);cursor:pointer;">−</button>
+      <input id="eqm-qty" type="number" inputmode="numeric" min="0" placeholder="0"
+        style="flex:1;text-align:center;font-size:36px;font-weight:800;border:2px solid var(--line);border-radius:16px;padding:8px;font-family:inherit;color:var(--ink);background:var(--white);min-width:0;"
+        oninput="eqmQtyInput(this.value)"/>
+      <button onclick="eqmAdj(1)" style="width:64px;height:64px;border-radius:16px;border:2px solid var(--line);background:var(--surface);font-size:30px;font-weight:300;color:var(--brand);cursor:pointer;">+</button>
+    </div>
+    <div style="display:flex;gap:10px;">
+      <button onclick="eqmDelete()" style="flex:1;height:52px;border-radius:14px;border:2px solid var(--danger);background:var(--white);color:var(--danger);font-size:13px;font-weight:700;cursor:pointer;">🗑 I-delete</button>
+      <button onclick="eqmNext()" style="flex:2;height:52px;border-radius:14px;border:none;background:var(--brand);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">Susunod →</button>
+    </div>`;
+  document.getElementById('eqm-bar').style.background='var(--brand)';
+  const ov=document.getElementById('eqm-overlay');
+  if(ov)ov.style.display='flex';
+  eqmRender();
 }
 
-// Adjust existing item qty
+// ════════════════════════════════════════
+// EDIT ORDER QUICK MODE
+// ════════════════════════════════════════
+function eqmRender(){
+  const total=eqmItems.length;
+  if(eqmIndex>=total){ eqmShowSummary(); return; }
+  const item=eqmItems[eqmIndex];
+  eqmCurrentQty=item.currentQty;
+
+  const pct=Math.round(eqmIndex/total*100);
+  document.getElementById('eqm-counter').textContent=`${eqmIndex+1} / ${total}`;
+  document.getElementById('eqm-bar').style.width=pct+'%';
+
+  const qtyEl=document.getElementById('eqm-qty');
+  if(qtyEl){
+    qtyEl.value=eqmCurrentQty||'';
+    qtyEl.style.borderColor=editOrderDeletedItems.has(item.itemId)?'var(--danger)':eqmCurrentQty>0?'var(--ok)':'var(--line)';
+  }
+
+  const isDeleted=editOrderDeletedItems.has(item.itemId);
+  document.getElementById('eqm-card-wrap').innerHTML=`
+    <div style="background:var(--white);border-radius:20px;padding:20px;box-shadow:0 2px 12px rgba(0,0,0,.08);">
+      ${isDeleted?`<div style="background:var(--dangerbg);color:var(--danger);border-radius:10px;padding:8px 12px;font-size:12px;font-weight:800;margin-bottom:12px;">🗑 Ide-delete ang item na ito</div>`:''}
+      <div style="font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Item</div>
+      <div style="font-size:20px;font-weight:800;line-height:1.3;margin-bottom:12px;${isDeleted?'text-decoration:line-through;color:var(--ink3);':''}">${item.name}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+        ${item.unit?`<span style="background:var(--brandbg);color:var(--brand);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;">${item.unit}</span>`:''}
+        ${item.price>0?`<span style="background:#f0fdf4;color:var(--ok);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;">₱${item.price.toFixed(2)}</span>`:''}
+      </div>
+      <div style="font-size:12px;color:var(--ink3);">Dati: <strong>${item.origQty} ${item.unit}</strong></div>
+    </div>`;
+}
+
+function eqmAdj(delta){
+  if(editOrderDeletedItems.has(eqmItems[eqmIndex]?.itemId)) return;
+  eqmCurrentQty=Math.max(0,eqmCurrentQty+delta);
+  const el=document.getElementById('eqm-qty');
+  if(el){el.value=eqmCurrentQty||'';el.style.borderColor=eqmCurrentQty>0?'var(--ok)':'var(--line)';}
+}
+
+function eqmQtyInput(val){
+  if(editOrderDeletedItems.has(eqmItems[eqmIndex]?.itemId)) return;
+  eqmCurrentQty=Math.max(0,parseFloat(val)||0);
+  const el=document.getElementById('eqm-qty');
+  if(el)el.style.borderColor=eqmCurrentQty>0?'var(--ok)':'var(--line)';
+}
+
+function eqmDelete(){
+  const item=eqmItems[eqmIndex];
+  if(!item)return;
+  if(editOrderDeletedItems.has(item.itemId)){
+    editOrderDeletedItems.delete(item.itemId);
+    item.currentQty=item.origQty;
+  }else{
+    editOrderDeletedItems.add(item.itemId);
+    item.currentQty=0;
+  }
+  eqmCurrentQty=item.currentQty;
+  eqmRender();
+}
+
+function eqmNext(){
+  const item=eqmItems[eqmIndex];
+  if(!item)return;
+  if(!editOrderDeletedItems.has(item.itemId)){
+    if(eqmCurrentQty<=0){
+      const existing=document.getElementById('eqm-zero-confirm');
+      if(existing)existing.remove();
+      document.getElementById('eqm-card-wrap').innerHTML+=`
+        <div id="eqm-zero-confirm" style="margin-top:10px;background:var(--warnbg);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;">
+          <div style="font-size:13px;font-weight:700;color:var(--warn);">⚠️ 0 ang qty. I-delete ba ang item na ito?</div>
+          <div style="display:flex;gap:8px;">
+            <button onclick="eqmConfirmDelete()" style="flex:1;height:40px;border-radius:10px;border:none;background:var(--danger);color:#fff;font-size:13px;font-weight:700;cursor:pointer;">🗑 I-delete</button>
+            <button onclick="document.getElementById('eqm-zero-confirm')?.remove();document.getElementById('eqm-qty')?.focus();" style="flex:1;height:40px;border-radius:10px;border:2px solid var(--line);background:var(--white);color:var(--ink2);font-size:13px;font-weight:700;cursor:pointer;">↩ Mag-lagay ng Qty</button>
+          </div>
+        </div>`;
+      return;
+    }
+    item.currentQty=eqmCurrentQty;
+    if(eqmCurrentQty!==item.origQty) editOrderChanges[item.itemId]=eqmCurrentQty;
+    else delete editOrderChanges[item.itemId];
+  }
+  eqmIndex++;
+  eqmCurrentQty=eqmItems[eqmIndex]?.currentQty||eqmItems[eqmIndex]?.origQty||0;
+  eqmRender();
+}
+
+function eqmConfirmDelete(){
+  const item=eqmItems[eqmIndex];
+  if(!item)return;
+  editOrderDeletedItems.add(item.itemId);
+  item.currentQty=0;
+  delete editOrderChanges[item.itemId];
+  eqmIndex++;
+  eqmCurrentQty=eqmItems[eqmIndex]?.origQty||0;
+  eqmRender();
+}
+
+function eqmShowSummary(){
+  const changes=Object.keys(editOrderChanges).length;
+  const deletes=editOrderDeletedItems.size;
+  document.getElementById('eqm-counter').textContent='Tapos!';
+  document.getElementById('eqm-bar').style.width='100%';
+  document.getElementById('eqm-bar').style.background='var(--ok)';
+
+  document.getElementById('eqm-card-wrap').innerHTML=`
+    <div style="background:var(--white);border-radius:20px;padding:24px;text-align:center;">
+      <div style="font-size:48px;margin-bottom:12px;">${changes||deletes?'✏️':'✅'}</div>
+      <div style="font-size:18px;font-weight:800;margin-bottom:8px;">${changes||deletes?'I-save ang mga pagbabago?':'Walang pagbabago'}</div>
+      ${changes?`<div style="font-size:13px;color:var(--ink3);margin-bottom:4px;">${changes} item${changes!==1?'s':''} na-update ang qty</div>`:''}
+      ${deletes?`<div style="font-size:13px;color:var(--danger);margin-bottom:4px;">🗑 ${deletes} item${deletes!==1?'s':''} ide-delete</div>`:''}
+    </div>`;
+
+  document.getElementById('eqm-controls').innerHTML=`
+    <div style="display:flex;gap:10px;">
+      <button onclick="eqmCancel()" style="flex:1;height:52px;border-radius:14px;border:1.5px solid var(--line);background:var(--white);color:var(--ink2);font-size:14px;font-weight:700;cursor:pointer;">Kanselahin</button>
+      ${changes||deletes
+        ?`<button onclick="eqmSave()" id="eqm-save-btn" style="flex:2;height:52px;border-radius:14px;border:none;background:var(--brand);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">💾 I-save</button>`
+        :`<button onclick="eqmCancel()" style="flex:2;height:52px;border-radius:14px;border:none;background:var(--ok);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">✓ Okay</button>`}
+    </div>`;
+}
+
+function eqmCancel(){
+  const ov=document.getElementById('eqm-overlay');
+  if(ov)ov.style.display='none';
+  editOrderChanges={};
+  editOrderDeletedItems=new Set();
+  editOrderNewItems=[];
+}
+
+async function eqmSave(){
+  const btn=document.getElementById('eqm-save-btn');
+  if(btn){btn.disabled=true;btn.textContent='Nag-se-save...';}
+  try{
+    if(Object.keys(editOrderChanges).length){
+      await apiPost({action:'updateOrderItems',orderId:editOrderId,changes:editOrderChanges});
+      Object.entries(editOrderChanges).forEach(([itemId,newQty])=>{
+        const row=allOrders.find(r=>r.orderId===editOrderId&&r.itemId===itemId);
+        if(row)row.qty=newQty;
+      });
+    }
+    if(editOrderDeletedItems.size){
+      await apiPost({action:'deleteOrderItems',orderId:editOrderId,itemIds:[...editOrderDeletedItems]});
+      allOrders=allOrders.filter(r=>!(r.orderId===editOrderId&&editOrderDeletedItems.has(r.itemId)));
+    }
+    const ov=document.getElementById('eqm-overlay');
+    if(ov)ov.style.display='none';
+    renderHistory();
+    renderHome();
+    showSaveSuccess('Order na-update!');
+    editOrderChanges={};
+    editOrderDeletedItems=new Set();
+  }catch(e){
+    toast('❌ '+e.message,'err');
+    if(btn){btn.disabled=false;btn.textContent='💾 I-save';}
+  }
+}
+
+// eoEx helper functions (used by old modal, kept for compat)
 function eoExAdj(itemId,ri,d){
   const el=document.getElementById('eoex-'+itemId);
   if(!el)return;
@@ -2533,7 +2668,14 @@ function pickSupForAdd(supId, supName){
 // ID GENERATORS
 // ════════════════════════════════════════
 function genSupId(){return `SUP-${(suppliers.length+1).toString().padStart(3,'0')}`;}
-function genItemId(){return `ITM-${(allItems.length+1).toString().padStart(4,'0')}`;}
+function genItemId(){
+  // Use highest existing numeric ID to avoid clashes with manually added items
+  const maxNum = allItems.reduce((max, i) => {
+    const m = i.id.match(/ITM-(\d+)/);
+    return m ? Math.max(max, parseInt(m[1])) : max;
+  }, 0);
+  return `ITM-${(maxNum+1).toString().padStart(4,'0')}`;
+}
 function genOrderId(){
   const d=new Date();
   return `ORD-${d.getFullYear().toString().slice(2)}${(d.getMonth()+1).toString().padStart(2,'0')}${d.getDate().toString().padStart(2,'0')}-${Math.floor(Math.random()*9000)+1000}`;
@@ -2739,6 +2881,7 @@ loadOrderkoItemLinks();
       <div style="font-size:16px;font-weight:700;">Quick Mode</div>
     </div>
     <div id="qm-sup-name" style="font-size:12px;color:var(--ink3);font-weight:600;margin-right:6px;"></div>
+    <button id="qm-back-btn" onclick="qmBack()" style="display:none;padding:0 10px;height:34px;border-radius:999px;border:1.5px solid var(--line);background:var(--white);color:var(--ink2);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">‹ Bumalik</button>
     <button onclick="switchToListView()" style="padding:0 12px;height:34px;border-radius:999px;border:1.5px solid var(--line);background:var(--white);color:var(--ink2);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:5px;">
       📋 Tingnan Lahat
     </button>
@@ -2766,6 +2909,40 @@ loadOrderkoItemLinks();
     <div style="display:flex;gap:10px;">
       <button onclick="qmSkip()" style="flex:1;height:52px;border-radius:14px;border:2px solid var(--danger);background:var(--white);color:var(--danger);font-size:14px;font-weight:700;cursor:pointer;">✕ Skip</button>
       <button onclick="qmNext()" style="flex:2;height:52px;border-radius:14px;border:none;background:var(--brand);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">Susunod →</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT ORDER QUICK MODE OVERLAY -->
+<div id="eqm-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:var(--surface);z-index:500;flex-direction:column;">
+  <div style="height:var(--NAV);background:var(--white);border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 14px;gap:10px;flex-shrink:0;">
+    <button onclick="eqmCancel()" style="width:34px;height:34px;border-radius:10px;border:none;background:var(--surface);font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>
+    <div style="flex:1;">
+      <div style="font-size:15px;font-weight:700;">I-edit ang Order</div>
+      <div id="eqm-order-id" style="font-size:11px;color:var(--ink3);"></div>
+    </div>
+    <div id="eqm-sup-name" style="font-size:12px;color:var(--ink3);font-weight:600;"></div>
+  </div>
+  <div style="padding:10px 16px;background:var(--white);border-bottom:1px solid var(--line);flex-shrink:0;">
+    <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+      <div id="eqm-counter" style="font-size:13px;font-weight:700;color:var(--ink2);">0 / 0</div>
+    </div>
+    <div style="height:6px;background:var(--line);border-radius:999px;overflow:hidden;">
+      <div id="eqm-bar" style="height:100%;background:var(--brand);border-radius:999px;transition:width .3s;width:0%;"></div>
+    </div>
+  </div>
+  <div id="eqm-card-wrap" style="flex:1;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch;"></div>
+  <div id="eqm-controls" style="padding:14px 16px 28px;background:var(--white);border-top:1px solid var(--line);flex-shrink:0;">
+    <div style="display:flex;gap:10px;margin-bottom:10px;">
+      <button onclick="eqmAdj(-1)" style="width:64px;height:64px;border-radius:16px;border:2px solid var(--line);background:var(--surface);font-size:30px;font-weight:300;color:var(--brand);cursor:pointer;">−</button>
+      <input id="eqm-qty" type="number" inputmode="numeric" min="0" placeholder="0"
+        style="flex:1;text-align:center;font-size:36px;font-weight:800;border:2px solid var(--line);border-radius:16px;padding:8px;font-family:inherit;color:var(--ink);background:var(--white);min-width:0;"
+        oninput="eqmQtyInput(this.value)"/>
+      <button onclick="eqmAdj(1)" style="width:64px;height:64px;border-radius:16px;border:2px solid var(--line);background:var(--surface);font-size:30px;font-weight:300;color:var(--brand);cursor:pointer;">+</button>
+    </div>
+    <div style="display:flex;gap:10px;">
+      <button onclick="eqmDelete()" style="flex:1;height:52px;border-radius:14px;border:2px solid var(--danger);background:var(--white);color:var(--danger);font-size:13px;font-weight:700;cursor:pointer;">🗑 I-delete</button>
+      <button onclick="eqmNext()" style="flex:2;height:52px;border-radius:14px;border:none;background:var(--brand);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">Susunod →</button>
     </div>
   </div>
 </div>
