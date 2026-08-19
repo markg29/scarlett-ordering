@@ -2372,23 +2372,23 @@ function eqmSwitchToList(){
       }).join('')
     : '<div style="padding:12px 13px;font-size:13px;color:var(--ink3);">Walang existing items</div>';
 
-  // New items added during this edit session
-  const newItems=eqmItems.filter(i=>!i.isExisting&&i.currentQty>0);
+  // Items available to add — all supplier items not yet in order
+  const availableItems=eqmItems.filter(i=>!i.isExisting);
   const addWrap=document.getElementById('eo-add-items');
-  if(newItems.length){
-    addWrap.innerHTML=newItems.map(item=>`
+  if(availableItems.length){
+    addWrap.innerHTML=availableItems.map(item=>`
       <div style="display:flex;align-items:center;gap:8px;padding:10px 13px;border-bottom:1px solid var(--line);">
         <div style="flex:1;min-width:0;">
           <div style="font-size:13px;font-weight:600;">${item.name}${item.unit?` <span style="font-size:10px;font-weight:700;color:var(--brand);background:var(--brandbg);padding:1px 5px;border-radius:4px;">${item.unit}</span>`:''}</div>
-          <span style="font-size:10px;font-weight:700;background:var(--brandbg);color:var(--brand);border-radius:4px;padding:1px 5px;">✨ Bagong item</span>
+          ${item.price>0?`<div style="font-size:11px;color:var(--ok);font-weight:700;">₱${item.price.toFixed(2)}</div>`:''}
         </div>
-        <input type="number" value="${item.currentQty}" min="0" inputmode="numeric"
-          style="width:52px;text-align:center;border:1.5px solid var(--line);border-radius:8px;padding:4px;font-size:14px;font-weight:700;"
+        <input type="number" value="${item.currentQty||''}" min="0" inputmode="numeric"
+          placeholder="0"
+          style="width:52px;text-align:center;border:1.5px solid ${item.currentQty>0?'var(--ok)':'var(--line)'};border-radius:8px;padding:4px;font-size:14px;font-weight:700;"
           oninput="eqmListUpdateNew('${item.itemId}',this.value)"/>
-        <button onclick="eqmListRemoveNew('${item.itemId}')" style="width:30px;height:30px;border-radius:8px;border:none;background:var(--dangerbg);color:var(--danger);cursor:pointer;font-size:14px;flex-shrink:0;">🗑</button>
       </div>`).join('');
   }else{
-    addWrap.innerHTML='<div style="padding:12px 13px;font-size:13px;color:var(--ink3);">Walang bagong items na naidagdag</div>';
+    addWrap.innerHTML='<div style="padding:12px 13px;font-size:13px;color:var(--ink3);">Lahat ng items ay nasa order na</div>';
   }
 
   // Update save button to use eqmSave
