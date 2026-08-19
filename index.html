@@ -1370,7 +1370,7 @@ function renderHome(){
     rd.innerHTML=recent.map(o=>{
       const rows=allOrders.filter(r=>r.orderId===o.orderId);
       const total=rows.reduce((s,r)=>s+r.price*r.qty,0);
-      return `<div class="rc" onclick="goTab('history')">
+      return `<div class="rc" onclick="goTab('history');openHistoryOrder('${E(o.orderId)}')">
         <div class="rc-head"><span class="rc-id">${o.orderId}</span><span class="rc-date">${o.date}</span></div>
         <div class="rc-sup">${o.supplierName}</div>
         <div class="rc-foot"><span class="rc-meta">${rows.length} items</span><span class="rc-amt">₱${total.toFixed(2)}</span></div>
@@ -1936,6 +1936,30 @@ function toggleHCard(gi){
   const el=document.getElementById('hc-'+gi);
   if(!el)return;
   el.classList.toggle('open');
+}
+
+function openHistoryOrder(orderId){
+  // Render history first, then find and expand the right card
+  renderHistory();
+  // Find the group index for this orderId
+  const groups=[];
+  const seen=new Set();
+  allOrders.forEach(o=>{
+    if(!seen.has(o.orderId)){seen.add(o.orderId);groups.push(o.orderId);}
+  });
+  // Groups are rendered in reverse order
+  const reversed=[...groups].reverse();
+  const gi=reversed.indexOf(orderId);
+  if(gi>=0){
+    // Expand that card after a short delay for render to finish
+    setTimeout(()=>{
+      const el=document.getElementById('hc-'+gi);
+      if(el){
+        el.classList.add('open');
+        el.scrollIntoView({behavior:'smooth',block:'start'});
+      }
+    },100);
+  }
 }
 
 function askDeleteOrder(orderId){
