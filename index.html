@@ -850,21 +850,24 @@ async function apiGet(p,_retry=0){
       redirect:'follow',cache:'no-store'
     });
     if(!r.ok){
-      if(_retry<2){
-        await new Promise(res=>setTimeout(res,1000));
-        return apiGet(p,_retry+1);
-      }
-      throw new Error(`HTTP ${r.status}`);
+      // Non-ok HTTP — retry with backoff, no limit
+      const delay=Math.min(1000*Math.pow(1.5,_retry),30000);
+      await new Promise(res=>setTimeout(res,delay));
+      return apiGet(p,_retry+1);
     }
     const d=await r.json();
     if(!d.ok)throw new Error(d.error||'Error');
     return d;
   }catch(e){
-    if(_retry<2&&(e.name==='TypeError'||String(e).includes('fetch'))){
-      await new Promise(res=>setTimeout(res,1500));
+    // Network error / offline — retry forever with backoff
+    if(e.name==='TypeError'||String(e).includes('fetch')||e.name==='AbortError'){
+      setConnStatus('error');
+      const delay=Math.min(2000*Math.pow(1.5,_retry),60000); // max 60s between retries
+      await new Promise(res=>setTimeout(res,delay));
+      setConnStatus('checking');
       return apiGet(p,_retry+1);
     }
-    throw e;
+    throw e; // Server errors (d.ok=false) — don't retry
   }
 }
 async function apiPost(b,_retry=0){
@@ -1235,7 +1238,7 @@ async function loadAll(){
     renderHome();
     restoreCartState();
     if(activeSup) renderItems();
-  }else{
+    setConnStatus('ok'); // Show connected from cache while fresh data loads
     // No cache — show skeleton loading UI so app doesn't look broken
     const supScroll = document.getElementById('sup-scroll');
     if(supScroll) supScroll.innerHTML = `<div class="sup-row-inner">${[1,2,3].map(()=>`
