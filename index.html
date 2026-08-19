@@ -851,24 +851,35 @@ async function apiGet(p,_retry=0){
       redirect:'follow',cache:'no-store'
     });
     if(!r.ok){
-      // Non-ok HTTP — retry with backoff, no limit
-      const delay=Math.min(1000*Math.pow(1.5,_retry),30000);
-      await new Promise(res=>setTimeout(res,delay));
-      return apiGet(p,_retry+1);
+      // 404 from Apps Script is a redirect artifact — retry quickly, max 3 times
+      if(r.status===404&&_retry<3){
+        await new Promise(res=>setTimeout(res,800));
+        return apiGet(p,_retry+1);
+      }
+      if(r.status!==404){
+        // Other HTTP errors — retry with backoff, max 3 times
+        if(_retry<3){
+          await new Promise(res=>setTimeout(res,1000*(_retry+1)));
+          return apiGet(p,_retry+1);
+        }
+      }
+      throw new Error(`HTTP ${r.status}`);
     }
     const d=await r.json();
     if(!d.ok)throw new Error(d.error||'Error');
     return d;
   }catch(e){
-    // Network error / offline — retry forever with backoff
+    // Network error / offline — retry with backoff, max 5 times then throw
     if(e.name==='TypeError'||String(e).includes('fetch')||e.name==='AbortError'){
-      setConnStatus('error');
-      const delay=Math.min(2000*Math.pow(1.5,_retry),60000); // max 60s between retries
-      await new Promise(res=>setTimeout(res,delay));
-      setConnStatus('checking');
-      return apiGet(p,_retry+1);
+      if(_retry<5){
+        setConnStatus('error');
+        const delay=Math.min(2000*(_retry+1),10000);
+        await new Promise(res=>setTimeout(res,delay));
+        setConnStatus('checking');
+        return apiGet(p,_retry+1);
+      }
     }
-    throw e; // Server errors (d.ok=false) — don't retry
+    throw e;
   }
 }
 async function apiPost(b,_retry=0){
