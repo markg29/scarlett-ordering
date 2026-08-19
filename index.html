@@ -1261,17 +1261,20 @@ async function loadAll(){
     setConnStatus('checking');
   }
 
-  // Fetch fresh data in background
+  // Fetch fresh data in background (60s timeout per call)
   try{
+    const withTimeout = (promise, ms) => Promise.race([
+      promise,
+      new Promise((_,rej)=>setTimeout(()=>rej(new Error('Timeout')),ms))
+    ]);
     const [d, dInv] = await Promise.all([
-      apiGet({action:'getAll'}),
-      apiGet({action:'getInventory'}).catch(()=>({goods:[]}))
+      withTimeout(apiGet({action:'getAll'}), 60000),
+      withTimeout(apiGet({action:'getInventory'}), 60000).catch(()=>({goods:[]}))
     ]);
     suppliers=(d.suppliers||[]).map(r=>({id:String(r[0]||''),name:String(r[1]||''),logo:String(r[2]||'')})).filter(s=>s.id&&s.name);
     allItems=(d.items||[]).map(r=>({id:String(r[0]||''),supplierId:String(r[1]||''),name:String(r[2]||''),unit:String(r[3]||''),price:parseFloat(r[4])||0,maxOrder:r[5]!==''&&r[5]!==null&&r[5]!==undefined?parseInt(r[5])||0:0,imageUrl:String(r[6]||''),category:String(r[7]||'')})).filter(i=>i.id&&i.name);
     allOrders=(d.orders||[]).map(r=>({orderId:String(r[0]||''),date:fmtDate(r[1]),supplierId:String(r[2]||''),supplierName:String(r[3]||''),itemId:String(r[4]||''),itemName:String(r[5]||''),qty:parseFloat(r[6])||0,unit:String(r[7]||''),price:parseFloat(r[8])||0,notes:String(r[9]||'')})).filter(o=>o.orderId);
     inventoryGoods=(dInv.goods||[]).map(r=>({id:String(r[0]||''),name:String(r[1]||''),quantity:parseFloat(r[4])||0,minStockQty:parseFloat(r[5])||0,unit:String(r[7]||'')})).filter(g=>g.id&&g.name);
-    setConnStatus('ok');
     setConnStatus('ok');
     saveDataCache(d, dInv);
     renderHome();
@@ -2278,7 +2281,7 @@ function openEditOrder(orderId){
       <button onclick="eqmAdj(1)" style="width:64px;height:64px;border-radius:16px;border:2px solid var(--line);background:var(--surface);font-size:30px;font-weight:300;color:var(--brand);cursor:pointer;">+</button>
     </div>
     <div style="display:flex;gap:10px;">
-      <button onclick="eqmDelete()" style="flex:1;height:52px;border-radius:14px;border:2px solid var(--danger);background:var(--white);color:var(--danger);font-size:13px;font-weight:700;cursor:pointer;">🗑 I-delete</button>
+      <button id="eqm-del-btn" onclick="eqmDelete()" style="flex:1;height:52px;border-radius:14px;border:2px solid var(--danger);background:var(--white);color:var(--danger);font-size:13px;font-weight:700;cursor:pointer;">🗑 I-delete</button>
       <button onclick="eqmNext()" style="flex:2;height:52px;border-radius:14px;border:none;background:var(--brand);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">Susunod →</button>
     </div>`;
   document.getElementById('eqm-bar').style.background='var(--brand)';
@@ -3149,7 +3152,7 @@ async function silentRefresh(){
   finally{ _silentRefreshing = false; }
 }
 // Refresh every 30 seconds silently
-setInterval(silentRefresh, 30000);
+setInterval(silentRefresh, 60000); // 60s interval - enough for most use cases
 
 // ════════════════════════════════════════
 // BOOT
@@ -3163,6 +3166,21 @@ if('serviceWorker' in navigator){
     })
     .catch(()=>{});
 }
+
+// Resume from background — restart if status is offline/checking
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState === 'visible'){
+    const dot = document.getElementById('conn-dot');
+    const bg = dot ? dot.style.background : '';
+    // Red (offline) or yellow (checking) = something went wrong while in background
+    if(bg === '#ef4444' || bg === '#f59e0b'){
+      _silentRefreshing = false; // unblock any stuck refresh
+      setConnStatus('checking');
+      silentRefresh();
+    }
+  }
+});
+
 loadAll();
 loadOrderkoItemLinks();
 </script>
@@ -3237,7 +3255,7 @@ loadOrderkoItemLinks();
       <button onclick="eqmAdj(1)" style="width:64px;height:64px;border-radius:16px;border:2px solid var(--line);background:var(--surface);font-size:30px;font-weight:300;color:var(--brand);cursor:pointer;">+</button>
     </div>
     <div style="display:flex;gap:10px;">
-      <button onclick="eqmDelete()" style="flex:1;height:52px;border-radius:14px;border:2px solid var(--danger);background:var(--white);color:var(--danger);font-size:13px;font-weight:700;cursor:pointer;">🗑 I-delete</button>
+      <button id="eqm-del-btn" onclick="eqmDelete()" style="flex:1;height:52px;border-radius:14px;border:2px solid var(--danger);background:var(--white);color:var(--danger);font-size:13px;font-weight:700;cursor:pointer;">🗑 I-delete</button>
       <button onclick="eqmNext()" style="flex:2;height:52px;border-radius:14px;border:none;background:var(--brand);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">Susunod →</button>
     </div>
   </div>
