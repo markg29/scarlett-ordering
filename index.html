@@ -1236,7 +1236,25 @@ async function loadAll(){
     restoreCartState();
     if(activeSup) renderItems();
   }else{
-    toast('Naglo-load...','');
+    // No cache — show skeleton loading UI so app doesn't look broken
+    const supScroll = document.getElementById('sup-scroll');
+    if(supScroll) supScroll.innerHTML = `<div class="sup-row-inner">${[1,2,3].map(()=>`
+      <div class="sup-chip" style="opacity:.5;pointer-events:none;">
+        <div class="sc-em" style="background:var(--line);border-radius:8px;width:28px;height:28px;"></div>
+        <div class="sc-info">
+          <div style="background:var(--line);border-radius:4px;height:12px;width:80px;margin-bottom:6px;"></div>
+          <div style="background:var(--line);border-radius:4px;height:10px;width:50px;"></div>
+        </div>
+      </div>`).join('')}</div>`;
+    const recentHome = document.getElementById('recent-home');
+    if(recentHome) recentHome.innerHTML = [1,2].map(()=>`
+      <div class="rc" style="opacity:.5;pointer-events:none;">
+        <div style="background:var(--line);border-radius:4px;height:11px;width:120px;margin-bottom:8px;"></div>
+        <div style="background:var(--line);border-radius:4px;height:14px;width:160px;margin-bottom:8px;"></div>
+        <div style="background:var(--line);border-radius:4px;height:11px;width:80px;"></div>
+      </div>`).join('');
+    // Show loading indicator in connection status
+    setConnStatus('checking');
   }
 
   // Fetch fresh data in background
