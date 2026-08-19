@@ -1075,7 +1075,7 @@ function qmRender(){
         ${item.unit?`<span style="background:var(--brandbg);color:var(--brand);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;">${item.unit}</span>`:''}
         ${item.price>0?`<span style="background:var(--okbg);color:var(--ok);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;">₱${item.price.toFixed(2)}</span>`:''}
         ${freq>=3?`<span style="background:#e65100;color:#fff;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;">🔥 Madalas</span>`:''}
-        ${stockInfo?`<span style="background:var(--surface);color:var(--ink3);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;">📦 ${stockInfo.quantity}${stockInfo.unit?" "+stockInfo.unit:" Stocks"}</span>`:''}
+        ${stockInfo?`<span style="background:var(--surface);color:var(--ink3);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;">📦 Stock: ${stockInfo.quantity}${stockInfo.unit?" "+stockInfo.unit:""}</span>`:''}
         ${item.maxOrder>0?`<span style="background:var(--warnbg);color:var(--warn);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;">MAX ${item.maxOrder}</span>`:''}
       </div>
       ${isSkipped?'<div style="background:var(--dangerbg);color:var(--danger);border-radius:10px;padding:8px 12px;font-size:12px;font-weight:700;">✕ Naka-skip na — mag-order ulit?</div>':''}
@@ -1501,7 +1501,7 @@ function renderItems(){
                   ${item.price>0?`<span class="ir-price">₱${item.price.toFixed(2)}</span>`:''}
                   ${freq>=3?`<span style="background:#e65100;color:#fff;border-radius:999px;padding:1px 7px;font-size:10px;font-weight:800;">🔥 Madalas</span>`:''}
                   ${hasMax?`<span style="background:var(--warnbg);color:var(--warn);border-radius:999px;padding:1px 6px;font-size:10px;font-weight:700;">MAX ${item.maxOrder}</span>`:''}
-                  ${stockQty!==null?`<span style="background:${lowStock?'var(--dangerbg)':'var(--surface)'};color:${lowStock?'var(--danger)':'var(--ink3)'};border-radius:999px;padding:1px 6px;font-size:10px;font-weight:700;">📦 ${stockQty}${stockInfo?.unit?" "+stockInfo.unit:" Stocks"}</span>`:''}
+                  ${stockQty!==null?`<span style="background:${lowStock?'var(--dangerbg)':'var(--surface)'};color:${lowStock?'var(--danger)':'var(--ink3)'};border-radius:999px;padding:1px 6px;font-size:10px;font-weight:700;">📦 Stock: ${stockQty}${stockInfo?.unit?" "+stockInfo.unit:""}</span>`:''}
                 </div>
               </div>
 
