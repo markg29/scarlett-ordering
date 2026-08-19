@@ -21,6 +21,8 @@
 <!-- PWA -->
 <link rel="manifest" href="data:application/json;charset=utf-8,%7B%22name%22%3A%22OrderKo%22%2C%22short_name%22%3A%22OrderKo%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23f5f6f9%22%2C%22theme_color%22%3A%22%231a56db%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcng9IjIyIiBmaWxsPSIjMWE1NmRiIi8%2BPHRleHQgeT0iLjg1ZW0iIGZvbnQtc2l6ZT0iNjUiIHg9IjUwJSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsLHNhbnMtc2VyaWYiIGZpbGw9IndoaXRlIj5PSzwvdGV4dD48L3N2Zz4%3D%22%2C%22sizes%22%3A%22any%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D"/>
 <meta name="theme-color" content="#1a56db"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
 <meta name="apple-mobile-web-app-title" content="OrderKo"/>
@@ -3073,9 +3075,12 @@ function E(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace
 // ════════════════════════════════════════
 // AUTO-REFRESH
 // ════════════════════════════════════════
+let _silentRefreshing = false;
 async function silentRefresh(){
+  if(_silentRefreshing) return; // Prevent concurrent calls
   // Don't refresh during checkout flow
   if(curPage === 'review' || curPage === 'success') return;
+  _silentRefreshing = true;
   try{
     const [d, dInv] = await Promise.all([
       apiGet({action:'getAll'}),
@@ -3093,6 +3098,7 @@ async function silentRefresh(){
     refreshFloat();
     setConnStatus('ok');
   }catch(e){ setConnStatus('error'); }
+  finally{ _silentRefreshing = false; }
 }
 // Refresh every 30 seconds silently
 setInterval(silentRefresh, 30000);
