@@ -783,6 +783,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--surface);color:
 
     <!-- Add more items from supplier -->
     <div class="f-lbl" style="margin-bottom:8px;">Mag-add ng Items</div>
+    <input id="eo-add-search" class="f-inp" placeholder="🔍 Maghanap ng item..." oninput="eqmFilterAddItems()" style="margin-bottom:8px;"/>
     <div id="eo-add-items" style="background:var(--white);border-radius:12px;overflow:hidden;margin-bottom:14px;border:1px solid var(--line);max-height:240px;overflow-y:auto;"></div>
 
     <div class="modal-btns">
@@ -2370,24 +2371,10 @@ function eqmSwitchToList(){
       }).join('')
     : '<div style="padding:12px 13px;font-size:13px;color:var(--ink3);">Walang existing items</div>';
 
-  // Items available to add — all supplier items not yet in order
-  const availableItems=eqmItems.filter(i=>!i.isExisting);
-  const addWrap=document.getElementById('eo-add-items');
-  if(availableItems.length){
-    addWrap.innerHTML=availableItems.map(item=>`
-      <div style="display:flex;align-items:center;gap:8px;padding:10px 13px;border-bottom:1px solid var(--line);">
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:13px;font-weight:600;">${item.name}${item.unit?` <span style="font-size:10px;font-weight:700;color:var(--brand);background:var(--brandbg);padding:1px 5px;border-radius:4px;">${item.unit}</span>`:''}</div>
-          ${item.price>0?`<div style="font-size:11px;color:var(--ok);font-weight:700;">₱${item.price.toFixed(2)}</div>`:''}
-        </div>
-        <input type="number" value="${item.currentQty||''}" min="0" inputmode="numeric"
-          placeholder="0"
-          style="width:52px;text-align:center;border:1.5px solid ${item.currentQty>0?'var(--ok)':'var(--line)'};border-radius:8px;padding:4px;font-size:14px;font-weight:700;"
-          oninput="eqmListUpdateNew('${item.itemId}',this.value)"/>
-      </div>`).join('');
-  }else{
-    addWrap.innerHTML='<div style="padding:12px 13px;font-size:13px;color:var(--ink3);">Lahat ng items ay nasa order na</div>';
-  }
+  // Items available to add — render via separate function for search support
+  const searchEl = document.getElementById('eo-add-search');
+  if(searchEl) searchEl.value = '';
+  eqmRenderAddItems('');
 
   // Update save button to use eqmSave
   const saveBtn=document.getElementById('eo-btn');
@@ -2406,13 +2393,53 @@ function eqmListUndoDelete(itemId){
   eqmSwitchToList();
 }
 
-function eqmListUpdateNew(itemId, val){
+function eqmFilterAddItems(){
+  const q=document.getElementById('eo-add-search')?.value||'';
+  eqmRenderAddItems(q);
+}
+
+function eqmRenderAddItems(q=''){
+  const search=q.toLowerCase().trim();
+  let list=eqmItems.filter(i=>!i.isExisting);
+  if(search) list=list.filter(i=>i.name.toLowerCase().includes(search)||(i.unit||'').toLowerCase().includes(search));
+  const wrap=document.getElementById('eo-add-items');
+  if(!wrap) return;
+  if(!eqmItems.filter(i=>!i.isExisting).length){
+    wrap.innerHTML='<div style="padding:12px 13px;font-size:13px;color:var(--ink3);">Lahat ng items ay nasa order na</div>';
+    return;
+  }
+  if(!list.length){
+    wrap.innerHTML='<div style="padding:12px 13px;font-size:13px;color:var(--ink3);">Walang resulta sa paghahanap</div>';
+    return;
+  }
+  wrap.innerHTML=list.map(item=>{
+    const added=item.currentQty>0;
+    return `<div style="display:flex;align-items:center;gap:8px;padding:10px 13px;border-bottom:1px solid var(--line);background:${added?'var(--okbg)':''};">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:600;">${item.name}${item.unit?` <span style="font-size:10px;font-weight:700;color:var(--brand);background:var(--brandbg);padding:1px 5px;border-radius:4px;">${item.unit}</span>`:''}</div>
+        ${item.price>0?`<div style="font-size:11px;color:var(--ok);font-weight:700;">₱${item.price.toFixed(2)}</div>`:''}
+      </div>
+      ${added?`<span style="font-size:11px;font-weight:700;color:var(--ok);white-space:nowrap;flex-shrink:0;">✓ ${item.currentQty}</span>`:''}
+      <input type="number" value="${item.currentQty||''}" min="0" inputmode="numeric" placeholder="0"
+        style="width:52px;text-align:center;border:1.5px solid ${added?'var(--ok)':'var(--line)'};border-radius:8px;padding:4px;font-size:14px;font-weight:700;"
+        oninput="eqmListUpdateNew('${E(item.itemId)}',this.value)"/>
+    </div>`;
+  }).join('');
+}
+
+function eqmListUpdateNew(itemId, val, inputEl){
   const item=eqmItems.find(i=>i.itemId===itemId);
   if(!item) return;
   const qty=Math.max(0,parseFloat(val)||0);
   item.currentQty=qty;
   editOrderNewItems=editOrderNewItems.filter(n=>n.itemId!==itemId);
   if(qty>0) editOrderNewItems.push({itemId:item.itemId,name:item.name,unit:item.unit,price:item.price,qty});
+  // Update save button count
+  const saveBtn=document.getElementById('eo-btn');
+  if(saveBtn){
+    const total=editOrderNewItems.length+Object.keys(editOrderChanges).length+editOrderDeletedItems.size;
+    saveBtn.textContent=total>0?`💾 I-save (${total})`:'💾 I-save';
+  }
 }
 
 function eqmListRemoveNew(itemId){
