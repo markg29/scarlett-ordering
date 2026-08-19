@@ -1075,7 +1075,7 @@ function qmRender(){
         ${item.unit?`<span style="background:var(--brandbg);color:var(--brand);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;">${item.unit}</span>`:''}
         ${item.price>0?`<span style="background:var(--okbg);color:var(--ok);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;">₱${item.price.toFixed(2)}</span>`:''}
         ${freq>=3?`<span style="background:#e65100;color:#fff;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;">🔥 Madalas</span>`:''}
-        ${stockInfo?`<span style="background:var(--surface);color:var(--ink3);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;">📦 ${stockInfo.quantity} Stocks</span>`:''}
+        ${stockInfo?`<span style="background:var(--surface);color:var(--ink3);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;">📦 ${stockInfo.quantity}${stockInfo.unit?" "+stockInfo.unit:" Stocks"}</span>`:''}
         ${item.maxOrder>0?`<span style="background:var(--warnbg);color:var(--warn);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;">MAX ${item.maxOrder}</span>`:''}
       </div>
       ${isSkipped?'<div style="background:var(--dangerbg);color:var(--danger);border-radius:10px;padding:8px 12px;font-size:12px;font-weight:700;">✕ Naka-skip na — mag-order ulit?</div>':''}
@@ -1278,7 +1278,7 @@ async function loadAll(){
     suppliers=(cached.suppliers||[]).map(r=>({id:String(r[0]||''),name:String(r[1]||''),logo:String(r[2]||'')})).filter(s=>s.id&&s.name);
     allItems=(cached.items||[]).map(r=>({id:String(r[0]||''),supplierId:String(r[1]||''),name:String(r[2]||''),unit:String(r[3]||''),price:parseFloat(r[4])||0,maxOrder:r[5]!==''&&r[5]!==null&&r[5]!==undefined?parseInt(r[5])||0:0,imageUrl:String(r[6]||''),category:String(r[7]||'')})).filter(i=>i.id&&i.name);
     allOrders=(cached.orders||[]).map(r=>({orderId:String(r[0]||''),date:fmtDate(r[1]),supplierId:String(r[2]||''),supplierName:String(r[3]||''),itemId:String(r[4]||''),itemName:String(r[5]||''),qty:parseFloat(r[6])||0,unit:String(r[7]||''),price:parseFloat(r[8])||0,notes:String(r[9]||'')})).filter(o=>o.orderId);
-    inventoryGoods=(cached.inventory||[]).map(r=>({id:String(r[0]||''),name:String(r[1]||''),quantity:parseFloat(r[4])||0,minStockQty:parseFloat(r[5])||0})).filter(g=>g.id&&g.name);
+    inventoryGoods=(cached.inventory||[]).map(r=>({id:String(r[0]||''),name:String(r[1]||''),quantity:parseFloat(r[4])||0,minStockQty:parseFloat(r[5])||0,unit:String(r[7]||'')})).filter(g=>g.id&&g.name);
     renderHome();
     restoreCartState();
     if(activeSup) renderItems();
@@ -1295,7 +1295,7 @@ async function loadAll(){
     suppliers=(d.suppliers||[]).map(r=>({id:String(r[0]||''),name:String(r[1]||''),logo:String(r[2]||'')})).filter(s=>s.id&&s.name);
     allItems=(d.items||[]).map(r=>({id:String(r[0]||''),supplierId:String(r[1]||''),name:String(r[2]||''),unit:String(r[3]||''),price:parseFloat(r[4])||0,maxOrder:r[5]!==''&&r[5]!==null&&r[5]!==undefined?parseInt(r[5])||0:0,imageUrl:String(r[6]||''),category:String(r[7]||'')})).filter(i=>i.id&&i.name);
     allOrders=(d.orders||[]).map(r=>({orderId:String(r[0]||''),date:fmtDate(r[1]),supplierId:String(r[2]||''),supplierName:String(r[3]||''),itemId:String(r[4]||''),itemName:String(r[5]||''),qty:parseFloat(r[6])||0,unit:String(r[7]||''),price:parseFloat(r[8])||0,notes:String(r[9]||'')})).filter(o=>o.orderId);
-    inventoryGoods=(dInv.goods||[]).map(r=>({id:String(r[0]||''),name:String(r[1]||''),quantity:parseFloat(r[4])||0,minStockQty:parseFloat(r[5])||0})).filter(g=>g.id&&g.name);
+    inventoryGoods=(dInv.goods||[]).map(r=>({id:String(r[0]||''),name:String(r[1]||''),quantity:parseFloat(r[4])||0,minStockQty:parseFloat(r[5])||0,unit:String(r[7]||'')})).filter(g=>g.id&&g.name);
     setConnStatus('ok');
     setConnStatus('ok');
     saveDataCache(d, dInv);
@@ -1501,7 +1501,7 @@ function renderItems(){
                   ${item.price>0?`<span class="ir-price">₱${item.price.toFixed(2)}</span>`:''}
                   ${freq>=3?`<span style="background:#e65100;color:#fff;border-radius:999px;padding:1px 7px;font-size:10px;font-weight:800;">🔥 Madalas</span>`:''}
                   ${hasMax?`<span style="background:var(--warnbg);color:var(--warn);border-radius:999px;padding:1px 6px;font-size:10px;font-weight:700;">MAX ${item.maxOrder}</span>`:''}
-                  ${stockQty!==null?`<span style="background:${lowStock?'var(--dangerbg)':'var(--surface)'};color:${lowStock?'var(--danger)':'var(--ink3)'};border-radius:999px;padding:1px 6px;font-size:10px;font-weight:700;">📦 ${stockQty} Stocks</span>`:''}
+                  ${stockQty!==null?`<span style="background:${lowStock?'var(--dangerbg)':'var(--surface)'};color:${lowStock?'var(--danger)':'var(--ink3)'};border-radius:999px;padding:1px 6px;font-size:10px;font-weight:700;">📦 ${stockQty}${stockInfo?.unit?" "+stockInfo.unit:" Stocks"}</span>`:''}
                 </div>
               </div>
 
@@ -3039,7 +3039,7 @@ async function silentRefresh(){
     suppliers=(d.suppliers||[]).map(r=>({id:String(r[0]||''),name:String(r[1]||''),logo:String(r[2]||'')})).filter(s=>s.id&&s.name);
     allItems=(d.items||[]).map(r=>({id:String(r[0]||''),supplierId:String(r[1]||''),name:String(r[2]||''),unit:String(r[3]||''),price:parseFloat(r[4])||0,maxOrder:r[5]!==''&&r[5]!==null&&r[5]!==undefined?parseInt(r[5])||0:0,imageUrl:String(r[6]||''),category:String(r[7]||'')})).filter(i=>i.id&&i.name);
     allOrders=(d.orders||[]).map(r=>({orderId:String(r[0]||''),date:fmtDate(r[1]),supplierId:String(r[2]||''),supplierName:String(r[3]||''),itemId:String(r[4]||''),itemName:String(r[5]||''),qty:parseFloat(r[6])||0,unit:String(r[7]||''),price:parseFloat(r[8])||0,notes:String(r[9]||'')})).filter(o=>o.orderId);
-    inventoryGoods=(dInv.goods||[]).map(r=>({id:String(r[0]||''),name:String(r[1]||''),quantity:parseFloat(r[4])||0,minStockQty:parseFloat(r[5])||0})).filter(g=>g.id&&g.name);
+    inventoryGoods=(dInv.goods||[]).map(r=>({id:String(r[0]||''),name:String(r[1]||''),quantity:parseFloat(r[4])||0,minStockQty:parseFloat(r[5])||0,unit:String(r[7]||'')})).filter(g=>g.id&&g.name);
     if(curPage==='home')renderHome();
     else if(curPage==='history')renderHistorySilent(); // preserve open cards
     else if(curPage==='items')renderItemsSilent();
