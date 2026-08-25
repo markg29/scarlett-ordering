@@ -2974,16 +2974,20 @@ async function executeTransfer(){
 }
 
 // ════════════════════════════════════════
-// BORROWED ITEMS
+// KUMUHA SA IBANG SUPPLIER
 // ════════════════════════════════════════
 let borrowSupId = '';
-let borrowSelectedItem = null;
-let borrowQty = 0;
+let borrowCart = {}; // {itemId: qty} — items selected from other supplier
 
 function openBorrowModal(){
   borrowSupId = '';
-  borrowSelectedItem = null;
-  borrowQty = 0;
+  borrowCart = {};
+  // Reset global search
+  const gs = document.getElementById('borrow-global-search');
+  if(gs) gs.value = '';
+  document.getElementById('borrow-global-results').style.display = 'none';
+  document.getElementById('borrow-global-addall').style.display = 'none';
+
   // Show supplier list (exclude current supplier)
   const list = document.getElementById('borrow-sup-list');
   list.innerHTML = suppliers
@@ -3002,19 +3006,88 @@ function openBorrowModal(){
   openOverlay('mo-borrow');
 }
 
+function renderBorrowGlobal(){
+  const q = (document.getElementById('borrow-global-search')?.value||'').trim().toLowerCase();
+  const resultsWrap = document.getElementById('borrow-global-results');
+  const addAllWrap = document.getElementById('borrow-global-addall');
+  const addAllBtn = document.getElementById('borrow-add-all-btn2');
+
+  if(!q){
+    resultsWrap.style.display='none';
+    addAllWrap.style.display='none';
+    document.getElementById('borrow-step-sup').style.display='';
+    return;
+  }
+
+  // Hide supplier list, show global results
+  document.getElementById('borrow-step-sup').style.display='none';
+  resultsWrap.style.display='';
+
+  // Search across ALL suppliers except current
+  const results = allItems
+    .filter(i=>i.supplierId!==activeSup?.id)
+    .filter(i=>i.name.toLowerCase().includes(q)||(i.category||'').toLowerCase().includes(q));
+
+  if(!results.length){
+    resultsWrap.innerHTML='<div style="padding:16px;text-align:center;color:var(--ink3);font-size:13px;">Walang resulta</div>';
+    addAllWrap.style.display='none';
+    return;
+  }
+
+  resultsWrap.innerHTML = results.map(item=>{
+    const sup = suppliers.find(s=>s.id===item.supplierId);
+    const qty = borrowCart[item.id] || 0;
+    const inMainCart = cart.find(c=>c.itemId===item.id);
+    return `<div style="display:flex;align-items:center;gap:8px;padding:11px 13px;border-bottom:1px solid var(--line);background:${qty>0?'var(--brandbg)':''};">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:600;line-height:1.3;">${item.name}</div>
+        <div style="display:flex;gap:5px;margin-top:3px;flex-wrap:wrap;align-items:center;">
+          ${sup?`<span style="font-size:10px;color:var(--ink3);font-weight:600;">📦 ${sup.name}</span>`:''}
+          ${item.unit?`<span style="font-size:10px;font-weight:700;color:var(--brand);background:var(--brandbg);border-radius:4px;padding:1px 5px;">${item.unit}</span>`:''}
+          ${item.price>0?`<span style="font-size:10px;font-weight:700;color:var(--ok);">₱${item.price.toFixed(2)}</span>`:''}
+          ${inMainCart?`<span style="font-size:10px;font-weight:700;color:var(--ok);">✓ nasa cart</span>`:''}
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;">
+        ${qty>0?`
+          <button onclick="borrowSetQty('${E(item.id)}',-1,true)" style="width:26px;height:26px;border-radius:7px;border:1.5px solid var(--line);background:var(--white);font-size:15px;font-weight:700;color:var(--brand);cursor:pointer;">−</button>
+          <input type="number" value="${qty}" min="0" inputmode="numeric"
+            style="width:40px;text-align:center;border:1.5px solid var(--brand);border-radius:7px;padding:2px;font-size:13px;font-weight:700;"
+            oninput="borrowSetQtyDirect('${E(item.id)}',this.value,true)"/>
+          <button onclick="borrowSetQty('${E(item.id)}',1,true)" style="width:26px;height:26px;border-radius:7px;border:1.5px solid var(--line);background:var(--white);font-size:15px;font-weight:700;color:var(--brand);cursor:pointer;">+</button>
+        `:`
+          <button onclick="borrowSetQty('${E(item.id)}',1,true)"
+            style="height:30px;padding:0 10px;border-radius:999px;border:1.5px solid var(--brand);background:var(--brandbg);color:var(--brand);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">
+            + I-add
+          </button>
+        `}
+      </div>
+    </div>`;
+  }).join('');
+
+  // Update add all button
+  const selectedCount = Object.values(borrowCart).filter(v=>v>0).length;
+  if(selectedCount>0){
+    addAllWrap.style.display='';
+    if(addAllBtn) addAllBtn.textContent=`I-dagdag lahat sa Order (${selectedCount}) ✓`;
+  }else{
+    addAllWrap.style.display='none';
+  }
+}
+
 function borrowPickSup(supId, supName){
   borrowSupId = supId;
-  borrowSelectedItem = null;
-  borrowQty = 0;
+  borrowCart = {};
   document.getElementById('borrow-sup-name').textContent = supName;
   document.getElementById('borrow-search').value = '';
-  document.getElementById('borrow-qty-section').style.display = 'none';
   document.getElementById('borrow-step-sup').style.display = 'none';
   document.getElementById('borrow-step-item').style.display = '';
+  document.getElementById('borrow-qty-section').style.display = 'none';
   renderBorrowItems();
 }
 
 function borrowBackToSup(){
+  borrowCart = {};
   document.getElementById('borrow-step-sup').style.display = '';
   document.getElementById('borrow-step-item').style.display = 'none';
 }
@@ -3023,76 +3096,103 @@ function renderBorrowItems(){
   const q = (document.getElementById('borrow-search')?.value||'').toLowerCase();
   let list = allItems.filter(i=>i.supplierId===borrowSupId);
   if(q) list = list.filter(i=>i.name.toLowerCase().includes(q)||(i.category||'').toLowerCase().includes(q));
+
+  const selectedCount = Object.values(borrowCart).filter(v=>v>0).length;
+  const addAllBtn = document.getElementById('borrow-add-all-btn');
+  if(addAllBtn){
+    addAllBtn.style.display = selectedCount > 0 ? '' : 'none';
+    addAllBtn.textContent = `I-dagdag lahat sa Order (${selectedCount} items) ✓`;
+  }
+
   const wrap = document.getElementById('borrow-item-list');
   if(!list.length){
     wrap.innerHTML='<div style="padding:16px;text-align:center;color:var(--ink3);font-size:13px;">Walang resulta</div>';
     return;
   }
+
   wrap.innerHTML = list.map(item=>{
-    const inCart = cart.find(c=>c.itemId===item.id);
-    const selected = borrowSelectedItem?.id === item.id;
-    return `<div onclick="borrowSelectItem('${E(item.id)}')"
-      style="display:flex;align-items:center;gap:10px;padding:11px 13px;border-bottom:1px solid var(--line);cursor:pointer;background:${selected?'var(--brandbg)':inCart?'var(--okbg)':''};">
+    const qty = borrowCart[item.id] || 0;
+    const inMainCart = cart.find(c=>c.itemId===item.id);
+    const stockInfo = findStockByItemId(item.id);
+    return `<div style="display:flex;align-items:center;gap:8px;padding:11px 13px;border-bottom:1px solid var(--line);background:${qty>0?'var(--brandbg)':''};">
       <div style="flex:1;min-width:0;">
-        <div style="font-size:13px;font-weight:600;">${item.name}</div>
-        <div style="display:flex;gap:6px;margin-top:3px;flex-wrap:wrap;">
+        <div style="font-size:13px;font-weight:600;line-height:1.3;">${item.name}</div>
+        <div style="display:flex;gap:5px;margin-top:3px;flex-wrap:wrap;align-items:center;">
           ${item.unit?`<span style="font-size:10px;font-weight:700;color:var(--brand);background:var(--brandbg);border-radius:4px;padding:1px 5px;">${item.unit}</span>`:''}
           ${item.price>0?`<span style="font-size:10px;font-weight:700;color:var(--ok);">₱${item.price.toFixed(2)}</span>`:''}
-          ${inCart?`<span style="font-size:10px;font-weight:700;color:var(--ok);">✓ nasa cart</span>`:''}
+          ${inMainCart?`<span style="font-size:10px;font-weight:700;color:var(--ok);">✓ nasa cart</span>`:''}
+          ${stockInfo?`<span style="font-size:10px;color:var(--ink3);">📦 Stock: ${stockInfo.quantity}</span>`:''}
         </div>
       </div>
-      ${selected?'<div style="color:var(--brand);font-size:16px;">✓</div>':''}
+      <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;">
+        ${qty>0?`
+          <button onclick="borrowSetQty('${E(item.id)}',-1)" style="width:28px;height:28px;border-radius:8px;border:1.5px solid var(--line);background:var(--white);font-size:16px;font-weight:700;color:var(--brand);cursor:pointer;">−</button>
+          <input type="number" value="${qty}" min="0" inputmode="numeric"
+            style="width:44px;text-align:center;border:1.5px solid var(--brand);border-radius:8px;padding:3px;font-size:14px;font-weight:700;"
+            oninput="borrowSetQtyDirect('${E(item.id)}',this.value)"/>
+          <button onclick="borrowSetQty('${E(item.id)}',1)" style="width:28px;height:28px;border-radius:8px;border:1.5px solid var(--line);background:var(--white);font-size:16px;font-weight:700;color:var(--brand);cursor:pointer;">+</button>
+        `:`
+          <button onclick="borrowSetQty('${E(item.id)}',1)"
+            style="height:32px;padding:0 12px;border-radius:999px;border:1.5px solid var(--brand);background:var(--brandbg);color:var(--brand);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">
+            + I-add
+          </button>
+        `}
+      </div>
     </div>`;
   }).join('');
 }
 
-function borrowSelectItem(itemId){
-  borrowSelectedItem = allItems.find(i=>i.id===itemId);
-  if(!borrowSelectedItem) return;
-
-  // Pre-fill qty from cart if already there
-  const inCart = cart.find(c=>c.itemId===itemId);
-  borrowQty = inCart ? inCart.qty : 1;
-
-  const qtyEl = document.getElementById('borrow-qty');
-  if(qtyEl) qtyEl.value = borrowQty;
-  document.getElementById('borrow-selected-name').textContent =
-    borrowSelectedItem.name + (borrowSelectedItem.unit ? ' · ' + borrowSelectedItem.unit : '');
-  document.getElementById('borrow-qty-section').style.display = '';
-  renderBorrowItems(); // Re-render to show selection
+function borrowSetQty(itemId, delta, isGlobal=false){
+  const current = borrowCart[itemId] || 0;
+  const newQty = Math.max(0, current + delta);
+  if(newQty === 0) delete borrowCart[itemId];
+  else borrowCart[itemId] = newQty;
+  if(isGlobal) renderBorrowGlobal();
+  else renderBorrowItems();
 }
 
-function borrowAdj(delta){
-  borrowQty = Math.max(0, borrowQty + delta);
-  const el = document.getElementById('borrow-qty');
-  if(el) el.value = borrowQty;
+function borrowSetQtyDirect(itemId, val, isGlobal=false){
+  const qty = Math.max(0, parseFloat(val)||0);
+  if(qty === 0) delete borrowCart[itemId];
+  else borrowCart[itemId] = qty;
+  // Update add-all button count
+  const selectedCount = Object.values(borrowCart).filter(v=>v>0).length;
+  if(isGlobal){
+    const addAllWrap = document.getElementById('borrow-global-addall');
+    const addAllBtn = document.getElementById('borrow-add-all-btn2');
+    if(addAllWrap) addAllWrap.style.display = selectedCount>0 ? '' : 'none';
+    if(addAllBtn) addAllBtn.textContent = `I-dagdag lahat sa Order (${selectedCount}) ✓`;
+  }else{
+    const addAllBtn = document.getElementById('borrow-add-all-btn');
+    if(addAllBtn){
+      addAllBtn.style.display = selectedCount > 0 ? '' : 'none';
+      addAllBtn.textContent = `I-dagdag lahat sa Order (${selectedCount} items) ✓`;
+    }
+  }
 }
 
-function borrowQtyInput(val){
-  borrowQty = Math.max(0, parseFloat(val)||0);
-}
+function addAllBorrowedItems(){
+  const entries = Object.entries(borrowCart).filter(([_,qty])=>qty>0);
+  if(!entries.length){ toast('Walang napiling items!','err'); return; }
 
-function addBorrowedItem(){
-  if(!borrowSelectedItem) return;
-  if(borrowQty <= 0){ toast('Mag-lagay ng qty', 'err'); return; }
+  entries.forEach(([itemId, qty])=>{
+    const item = allItems.find(i=>i.id===itemId);
+    if(!item) return;
+    const existing = cart.findIndex(c=>c.itemId===itemId);
+    const entry = {itemId:item.id, name:item.name, unit:item.unit, price:item.price, qty, notes:''};
+    if(existing >= 0) cart[existing] = entry;
+    else cart.push(entry);
+    skippedItems.delete(itemId);
+  });
 
-  const item = borrowSelectedItem;
-  const existing = cart.findIndex(c=>c.itemId===item.id);
-  const entry = {itemId:item.id, name:item.name, unit:item.unit, price:item.price, qty:borrowQty, notes:''};
-
-  if(existing >= 0) cart[existing] = entry;
-  else cart.push(entry);
-
-  // Also mark as checked (remove from skipped)
-  skippedItems.delete(item.id);
   saveCartState();
   refreshFloat();
   updateCheckProgress();
-
   closeOverlay('mo-borrow');
-  toast(`${item.name} naidagdag! ✅`, 'ok');
-  renderItemsSilent(); // Re-render to show in items list if visible
+  toast(`${entries.length} item${entries.length!==1?'s':''} naidagdag! ✅`,'ok');
+  renderItemsSilent();
 }
+
 
 // ════════════════════════════════════════
 // ID GENERATORS
@@ -3327,6 +3427,7 @@ loadOrderkoItemLinks();
     </div>
     <div id="qm-sup-name" style="font-size:12px;color:var(--ink3);font-weight:600;margin-right:6px;"></div>
     <button id="qm-back-btn" onclick="qmBack()" style="display:none;padding:0 10px;height:34px;border-radius:999px;border:1.5px solid var(--line);background:var(--white);color:var(--ink2);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">‹ Bumalik</button>
+    <button onclick="openBorrowModal()" style="padding:0 10px;height:34px;border-radius:999px;border:1.5px solid var(--brand);background:var(--brandbg);color:var(--brand);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;">+ Ibang supplier</button>
     <button onclick="switchToListView()" style="padding:0 12px;height:34px;border-radius:999px;border:1.5px solid var(--line);background:var(--white);color:var(--ink2);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:5px;">
       📋 Tingnan Lahat
     </button>
@@ -3424,9 +3525,16 @@ loadOrderkoItemLinks();
     <div class="sheet-title">🏪 Kumuha sa Ibang Supplier</div>
     <div style="font-size:13px;color:var(--ink3);margin:-10px 0 14px;">May item na kailangan mo na wala sa kasalukuyang supplier? Piliin dito.</div>
 
-    <!-- Step 1: Supplier select -->
+    <!-- Global search across all suppliers -->
+    <input id="borrow-global-search" class="f-inp" placeholder="🔍 Maghanap ng item sa lahat ng supplier..." oninput="renderBorrowGlobal()" style="margin-bottom:8px;"/>
+    <div id="borrow-global-results" style="display:none;max-height:35vh;overflow-y:auto;border:1px solid var(--line);border-radius:13px;margin-bottom:10px;"></div>
+    <div id="borrow-global-addall" style="display:none;margin-bottom:12px;">
+      <button id="borrow-add-all-btn2" onclick="addAllBorrowedItems()" style="width:100%;height:44px;border-radius:14px;border:none;background:var(--brand);color:#fff;font-size:14px;font-weight:700;cursor:pointer;">I-dagdag lahat sa Order ✓</button>
+    </div>
+
+    <!-- Step 1: Supplier select (shown when no search) -->
     <div id="borrow-step-sup">
-      <div class="f-lbl">Saan mo kukunin ang item?</div>
+      <div class="f-lbl" style="margin-bottom:8px;">O pumili ng supplier:</div>
       <div id="borrow-sup-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;"></div>
     </div>
 
@@ -3435,20 +3543,13 @@ loadOrderkoItemLinks();
       <button onclick="borrowBackToSup()" style="display:flex;align-items:center;gap:4px;background:none;border:none;color:var(--brand);font-size:13px;font-weight:700;cursor:pointer;margin-bottom:12px;">‹ Pumili ng ibang supplier</button>
       <div id="borrow-sup-name" style="font-size:13px;font-weight:800;margin-bottom:10px;color:var(--ink);"></div>
       <input id="borrow-search" class="f-inp" placeholder="🔍 Maghanap ng item..." oninput="renderBorrowItems()" style="margin-bottom:8px;"/>
-      <div id="borrow-item-list" style="max-height:35vh;overflow-y:auto;border:1px solid var(--line);border-radius:13px;margin-bottom:12px;"></div>
+      <div id="borrow-item-list" style="max-height:45vh;overflow-y:auto;border:1px solid var(--line);border-radius:13px;margin-bottom:12px;"></div>
 
-      <!-- Qty input - shows after selecting item -->
-      <div id="borrow-qty-section" style="display:none;">
-        <div id="borrow-selected-name" style="font-size:14px;font-weight:700;margin-bottom:8px;"></div>
-        <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;">
-          <button onclick="borrowAdj(-1)" style="width:44px;height:44px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface);font-size:22px;font-weight:700;color:var(--brand);cursor:pointer;">−</button>
-          <input id="borrow-qty" type="number" inputmode="numeric" min="1" placeholder="0"
-            style="flex:1;text-align:center;font-size:24px;font-weight:800;border:1.5px solid var(--line);border-radius:12px;padding:10px;font-family:inherit;"
-            oninput="borrowQtyInput(this.value)"/>
-          <button onclick="borrowAdj(1)" style="width:44px;height:44px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface);font-size:22px;font-weight:700;color:var(--brand);cursor:pointer;">+</button>
-        </div>
-        <button id="borrow-add-btn" onclick="addBorrowedItem()" style="width:100%;height:48px;border-radius:14px;border:none;background:var(--brand);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">I-dagdag sa Order ✓</button>
-      </div>
+      <!-- Add all button - hidden until items selected -->
+      <button id="borrow-add-all-btn" onclick="addAllBorrowedItems()" style="display:none;width:100%;height:48px;border-radius:14px;border:none;background:var(--brand);color:#fff;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:4px;">I-dagdag lahat sa Order ✓</button>
+
+      <!-- Old single-item qty section - hidden -->
+      <div id="borrow-qty-section" style="display:none;"></div>
     </div>
   </div>
 </div>
