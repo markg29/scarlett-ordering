@@ -581,6 +581,11 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--surface);color:
 
 <!-- PAGE: REVIEW -->
 <div class="page" id="pg-review">
+  <div id="review-warning" style="display:none;margin:0 14px 12px;background:var(--warnbg);border:1.5px solid var(--warn);border-radius:14px;padding:12px 16px;">
+    <div style="font-size:13px;font-weight:700;color:var(--warn);margin-bottom:4px;">⚠️ Hindi pa nache-check ang lahat ng items</div>
+    <div id="review-warning-count" style="font-size:12px;color:var(--warn);opacity:.85;"></div>
+    <button onclick="goPage('items')" style="margin-top:8px;height:32px;padding:0 14px;border-radius:999px;border:1.5px solid var(--warn);background:transparent;color:var(--warn);font-size:12px;font-weight:700;cursor:pointer;">Bumalik at i-check →</button>
+  </div>
   <div id="review-list"></div>
   <div class="total-bar">
     <div class="tb-l">Kabuuang Halaga</div>
@@ -1702,33 +1707,42 @@ function updateCheckProgress(){
 
 function goToReview(){
   if(!cart.length){toast('Wala pang items!','err');return;}
-  // Check if all items are checked (carted or skipped)
-  const myItems=allItems.filter(i=>i.supplierId===activeSup?.id);
-  const checkedCart=new Set(cart.map(c=>c.itemId));
-  const unchecked=myItems.filter(i=>!checkedCart.has(i.id)&&!skippedItems.has(i.id));
-  if(unchecked.length>0){
-    toast(`⚠️ May ${unchecked.length} items pa na hindi nache-check!`,'warn');
-    // Scroll to first unchecked item and highlight it
-    const firstUncheckedId=unchecked[0].id;
-    // Find the item row — check both madalas and regular sections
-    const firstRow=document.querySelector(`[id^="irow-${firstUncheckedId}"]`)
-      || document.getElementById('irow-'+firstUncheckedId);
-    if(firstRow){
-      firstRow.scrollIntoView({behavior:'smooth',block:'center'});
-      // Flash highlight so user notices it
-      firstRow.style.transition='background .15s';
-      firstRow.style.background='#fff3cd';
-      setTimeout(()=>{firstRow.style.background='';},1200);
-    }
-    return;
-  }
+  // Always allow going to review — save button will be disabled if not all checked
   renderReview();
   goPage('review');
   document.getElementById('float-bar').classList.add('hide');
 }
+
+function allItemsChecked(){
+  const myItems=allItems.filter(i=>i.supplierId===activeSup?.id);
+  const checkedCart=new Set(cart.map(c=>c.itemId));
+  const unchecked=myItems.filter(i=>!checkedCart.has(i.id)&&!skippedItems.has(i.id));
+  return unchecked.length===0;
+}
 function renderReview(){
   if(!cart.length)return;
   const total=cart.reduce((s,c)=>s+c.price*c.qty,0);
+
+  // Show warning and lock save if not all items checked
+  const checked=allItemsChecked();
+  const warning=document.getElementById('review-warning');
+  const saveBtn=document.getElementById('btn-save');
+  if(warning){
+    warning.style.display=checked?'none':'';
+    if(!checked){
+      const myItems=allItems.filter(i=>i.supplierId===activeSup?.id);
+      const done=new Set([...cart.map(c=>c.itemId),...skippedItems]);
+      const uncheckedCount=myItems.filter(i=>!done.has(i.id)).length;
+      const warnCount=document.getElementById('review-warning-count');
+      if(warnCount) warnCount.textContent=`May ${uncheckedCount} item${uncheckedCount!==1?'s':''} na hindi pa nareview.`;
+    }
+  }
+  if(saveBtn){
+    saveBtn.disabled=!checked;
+    saveBtn.style.opacity=checked?'1':'0.55';
+    saveBtn.innerHTML=checked?'💾 I-save ang Order':'🔒 I-check muna ang lahat ng items';
+  }
+
   document.getElementById('review-list').innerHTML=
     '<div class="or-card">'+
     cart.map((c,i)=>`<div class="or-row">
@@ -1746,17 +1760,6 @@ function renderReview(){
     </div>`).join('')+
     '</div>';
   document.getElementById('review-total-v').textContent=`₱${total.toFixed(2)}`;
-}
-function removeCart(i){
-  const rem=cart.splice(i,1)[0];
-  const cb=document.getElementById('cb-'+rem.itemId);
-  const qn=document.getElementById('qn-'+rem.itemId);
-  const row=document.getElementById('irow-'+rem.itemId);
-  if(cb){cb.textContent='+';cb.classList.remove('in');}
-  if(qn){qn.classList.remove('active');qn.value=1;}
-  row?.classList.remove('in-cart');
-  if(!cart.length){goPage('items');return;}
-  renderReview();refreshFloat();
 }
 
 // ════════════════════════════════════════
