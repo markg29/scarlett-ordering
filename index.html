@@ -3082,19 +3082,26 @@ function renderBorrowGlobal(){
 
 function borrowPickSup(supId, supName){
   borrowSupId = supId;
-  borrowCart = {};
+  // Don't reset borrowCart — preserve items already selected from global search
   document.getElementById('borrow-sup-name').textContent = supName;
   document.getElementById('borrow-search').value = '';
   document.getElementById('borrow-step-sup').style.display = 'none';
   document.getElementById('borrow-step-item').style.display = '';
   document.getElementById('borrow-qty-section').style.display = 'none';
+  // Also hide global search results when showing supplier-specific list
+  document.getElementById('borrow-global-results').style.display = 'none';
+  const gs = document.getElementById('borrow-global-search');
+  if(gs) gs.value = '';
   renderBorrowItems();
 }
 
 function borrowBackToSup(){
-  borrowCart = {};
+  // Don't reset borrowCart — preserve selections when going back
   document.getElementById('borrow-step-sup').style.display = '';
   document.getElementById('borrow-step-item').style.display = 'none';
+  // Re-show global results if there was a search
+  const gs = document.getElementById('borrow-global-search');
+  if(gs?.value) renderBorrowGlobal();
 }
 
 function renderBorrowItems(){
@@ -3529,8 +3536,11 @@ loadOrderkoItemLinks();
 <div class="overlay" id="mo-borrow" onclick="closeOverlay('mo-borrow',event)">
   <div class="sheet" style="max-height:88vh;">
     <div class="sheet-handle"></div>
-    <div class="sheet-title">🏪 Kumuha sa Ibang Supplier</div>
-    <div style="font-size:13px;color:var(--ink3);margin:-10px 0 14px;">May item na kailangan mo na wala sa kasalukuyang supplier? Piliin dito.</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
+      <div class="sheet-title" style="margin-bottom:0;flex:1;">🏪 Kumuha sa Ibang Supplier</div>
+      <button onclick="closeOverlay('mo-borrow')" style="width:32px;height:32px;border-radius:50%;border:1.5px solid var(--line);background:var(--surface);color:var(--ink3);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">✕</button>
+    </div>
+    <div style="font-size:13px;color:var(--ink3);margin:-8px 0 14px;">May item na kailangan mo na wala sa kasalukuyang supplier? Piliin dito.</div>
 
     <!-- Global search across all suppliers -->
     <input id="borrow-global-search" class="f-inp" placeholder="🔍 Maghanap ng item sa lahat ng supplier..." oninput="renderBorrowGlobal()" style="margin-bottom:8px;"/>
