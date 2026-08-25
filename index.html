@@ -369,12 +369,17 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--surface);color:
 
 /* ── MODAL / SHEET ── */
 .overlay{
-  position:fixed;inset:0;background:rgba(0,0,0,.5);
-  backdrop-filter:blur(6px);z-index:400;
+  position:fixed;inset:0;background:rgba(0,0,0,.45);
+  z-index:400;
   display:flex;align-items:flex-end;
   opacity:0;pointer-events:none;transition:opacity .22s;
 }
 .overlay.on{opacity:1;pointer-events:all;}
+/* Borrow and legend modals must sit ABOVE QM overlay (z:500) */
+#mo-borrow, #mo-qm-legend{z-index:700;backdrop-filter:none;-webkit-backdrop-filter:none;}
+#mo-borrow.on, #mo-qm-legend.on{opacity:1;pointer-events:all;}
+/* Overlays that appear on top of QM (z:500) need z:600 */
+#mo-borrow.on, #mo-qm-legend.on{z-index:600;}
 .sheet{
   background:var(--white);border-radius:26px 26px 0 0;
   padding:0 18px 36px;width:100%;
@@ -3334,7 +3339,6 @@ function openOverlay(id){document.getElementById(id).classList.add('on');}
 function closeOverlay(id,e){
   if(e&&e.target!==document.getElementById(id))return;
   document.getElementById(id).classList.remove('on');
-  // Reset confirm modal to default state when closed
   if(id==='mo-confirm'){
     const cBtn=document.getElementById('confirm-btn');
     if(cBtn){cBtn.style.display='';cBtn.textContent='I-delete';cBtn.onclick=null;}
@@ -3610,4 +3614,4 @@ loadOrderkoItemLinks();
 </div>
 
 </body>
-</html> 
+</html>
