@@ -2352,47 +2352,57 @@ function renderEditOrderList(){
   const existing=allOrders.filter(r=>r.orderId===editOrderId);
   if(!existing.length) return;
 
-  // Header info
   document.getElementById('eo-info').innerHTML=
     `<strong>${editOrderId}</strong> · ${existing[0].supplierName} · <span style="color:var(--ink3);">${existing[0].date}</span>`;
 
-  // Section 1: Existing items in order — styled like regular item rows
-  const existingItems=eqmItems.filter(i=>i.isExisting);
-  document.getElementById('eo-current-items').innerHTML=existingItems.length
-    ? existingItems.map(item=>{
-        const isDeleted=editOrderDeletedItems.has(item.itemId);
-        return `<div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line);${isDeleted?'background:var(--dangerbg);opacity:.7;':''}">
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:14px;font-weight:700;${isDeleted?'text-decoration:line-through;':''}">${item.name}</div>
-            <div style="display:flex;gap:5px;margin-top:3px;flex-wrap:wrap;align-items:center;">
-              ${item.unit?`<span style="background:var(--brandbg);color:var(--brand);border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;">${item.unit}</span>`:''}
-              ${item.price>0?`<span style="background:var(--okbg);color:var(--ok);border-radius:999px;padding:1px 7px;font-size:11px;font-weight:700;">₱${item.price.toFixed(2)}</span>`:''}
-              <span style="font-size:11px;color:var(--ink3);">Dati: ${item.origQty}</span>
-            </div>
-          </div>
-          ${isDeleted
-            ?`<button onclick="eqmListUndoDelete('${E(item.itemId)}')" style="height:32px;padding:0 10px;border-radius:9px;border:1.5px solid var(--line);background:var(--white);color:var(--ink2);font-size:12px;font-weight:700;cursor:pointer;">↩ Undo</button>`
-            :`<div style="display:flex;align-items:center;gap:5px;flex-shrink:0;">
-                <button onclick="eoEditAdj('${E(item.itemId)}',-1)" style="width:30px;height:30px;border-radius:9px;border:1.5px solid var(--line);background:var(--surface);font-size:17px;font-weight:700;color:var(--brand);cursor:pointer;">−</button>
-                <input type="number" id="eoqty-${E(item.itemId)}" value="${item.currentQty}" min="0" inputmode="numeric"
-                  style="width:42px;text-align:center;border:1.5px solid ${item.currentQty>0?'var(--ok)':'var(--line)'};border-radius:9px;padding:4px;font-size:14px;font-weight:700;"
-                  oninput="eqmListUpdate('${E(item.itemId)}',this.value)"/>
-                <button onclick="eoEditAdj('${E(item.itemId)}',1)" style="width:30px;height:30px;border-radius:9px;border:1.5px solid var(--line);background:var(--surface);font-size:17px;font-weight:700;color:var(--brand);cursor:pointer;">+</button>
-                <button onclick="eqmListDelete('${E(item.itemId)}')" style="width:30px;height:30px;border-radius:9px;border:none;background:var(--dangerbg);color:var(--danger);cursor:pointer;font-size:13px;flex-shrink:0;">🗑</button>
-              </div>`}
-        </div>`;
-      }).join('')
-    : '<div style="padding:14px;font-size:13px;color:var(--ink3);">Walang items</div>';
-
-  // Section 2: Add items (supplier items not in order + borrowed items)
+  // Add items section: supplier items not yet in order and not borrowed
   eqmRenderAddItems('');
-  // Clear search
   const searchEl=document.getElementById('eo-add-search');
   if(searchEl) searchEl.value='';
 
-  // Update save button
+  // Current items section: existing order items + borrowed items with qty > 0
+  const orderedItems=[
+    ...eqmItems.filter(i=>i.isExisting),
+    ...eqmItems.filter(i=>!i.isExisting && i.currentQty>0 && i.supplierId && i.supplierId!==editOrderSupplierId)
+  ];
+  renderCurrentItemsList(orderedItems);
   updateEoSaveBtn();
 }
+
+function renderCurrentItemsList(items){
+  const wrap=document.getElementById('eo-current-items');
+  if(!wrap) return;
+  if(!items.length){
+    wrap.innerHTML='<div style="padding:14px;font-size:13px;color:var(--ink3);">Walang items</div>';
+    return;
+  }
+  wrap.innerHTML=items.map(item=>{
+    const isDeleted=editOrderDeletedItems.has(item.itemId);
+    const isBorrowed=item.supplierId && item.supplierId!==editOrderSupplierId;
+    return `<div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line);${isDeleted?'background:var(--dangerbg);opacity:.7;':''}">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:14px;font-weight:700;${isDeleted?'text-decoration:line-through;':''}">${item.name}</div>
+        <div style="display:flex;gap:5px;margin-top:3px;flex-wrap:wrap;align-items:center;">
+          ${item.unit?`<span style="background:var(--brandbg);color:var(--brand);border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;">${item.unit}</span>`:''}
+          ${item.price>0?`<span style="background:var(--okbg);color:var(--ok);border-radius:999px;padding:1px 7px;font-size:11px;font-weight:700;">₱${item.price.toFixed(2)}</span>`:''}
+          ${isBorrowed&&item.supplierName?`<span style="background:var(--surface);color:var(--ink3);border-radius:999px;padding:1px 7px;font-size:10px;font-weight:600;">📦 ${item.supplierName}</span>`:''}
+          ${!isBorrowed?`<span style="font-size:11px;color:var(--ink3);">Dati: ${item.origQty}</span>`:''}
+        </div>
+      </div>
+      ${isDeleted
+        ?`<button onclick="eqmListUndoDelete('${E(item.itemId)}')" style="height:32px;padding:0 10px;border-radius:9px;border:1.5px solid var(--line);background:var(--white);color:var(--ink2);font-size:12px;font-weight:700;cursor:pointer;">↩ Undo</button>`
+        :`<div style="display:flex;align-items:center;gap:5px;flex-shrink:0;">
+            <button onclick="eoEditAdj('${E(item.itemId)}',-1)" style="width:30px;height:30px;border-radius:9px;border:1.5px solid var(--line);background:var(--surface);font-size:17px;font-weight:700;color:var(--brand);cursor:pointer;">−</button>
+            <input type="number" id="eoqty-${E(item.itemId)}" value="${item.currentQty}" min="0" inputmode="numeric"
+              style="width:42px;text-align:center;border:1.5px solid ${item.currentQty>0?'var(--ok)':'var(--line)'};border-radius:9px;padding:4px;font-size:14px;font-weight:700;"
+              oninput="${isBorrowed?`eqmListUpdateNew('${E(item.itemId)}',this.value)`:`eqmListUpdate('${E(item.itemId)}',this.value)`}"/>
+            <button onclick="eoEditAdj('${E(item.itemId)}',1)" style="width:30px;height:30px;border-radius:9px;border:1.5px solid var(--line);background:var(--surface);font-size:17px;font-weight:700;color:var(--brand);cursor:pointer;">+</button>
+            <button onclick="${isBorrowed?`eqmRemoveAddedItem('${E(item.itemId)}')`:`eqmListDelete('${E(item.itemId)}')`}" style="width:30px;height:30px;border-radius:9px;border:none;background:var(--dangerbg);color:var(--danger);cursor:pointer;font-size:13px;flex-shrink:0;">🗑</button>
+          </div>`}
+    </div>`;
+  }).join('');
+}
+
 
 function eoEditAdj(itemId, delta){
   const el=document.getElementById('eoqty-'+itemId);
@@ -2533,6 +2543,12 @@ function eqmRemoveAddedItem(itemId){
   if(item){ item.currentQty=0; }
   editOrderNewItems=editOrderNewItems.filter(n=>n.itemId!==itemId);
   updateEoSaveBtn();
+  // Re-render both sections
+  const orderedItems=[
+    ...eqmItems.filter(i=>i.isExisting),
+    ...eqmItems.filter(i=>!i.isExisting && i.currentQty>0 && i.supplierId && i.supplierId!==editOrderSupplierId)
+  ];
+  renderCurrentItemsList(orderedItems);
   eqmRenderAddItems(document.getElementById('eo-add-search')?.value||'');
 }
 
@@ -3289,10 +3305,15 @@ function addAllBorrowedItems(){
   toast(`${entries.length} item${entries.length!==1?'s':''} naidagdag! ✅`,'ok');
 
   if(eqmActive){
-    // Refresh the edit order list view
-    if(document.getElementById('mo-edit-order')?.classList.contains('on')){
-      renderEditOrderList();
-    }
+    // Re-render current items list to show borrowed items at top
+    const orderedItems=[
+      ...eqmItems.filter(i=>i.isExisting),
+      ...eqmItems.filter(i=>!i.isExisting && i.currentQty>0 && i.supplierId && i.supplierId!==editOrderSupplierId)
+    ];
+    renderCurrentItemsList(orderedItems);
+    // Also re-render add section to remove items that are now in order
+    eqmRenderAddItems(document.getElementById('eo-add-search')?.value||'');
+    updateEoSaveBtn();
   }else{
     saveCartState();
     refreshFloat();
