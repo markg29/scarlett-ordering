@@ -1113,6 +1113,9 @@ function qmQtyInput(val){
 
 function qmNext(){
   const item=qmItems[qmIndex];
+  // Read actual input value — mobile may not have fired oninput yet
+  const qtyEl=document.getElementById('qm-qty');
+  if(qtyEl && qtyEl.value!=='') qmCurrentQty=Math.max(0,parseFloat(qtyEl.value)||0);
   // If qty is 0, must confirm — either skip or go back and add qty
   if(qmCurrentQty<=0){
     // Remove existing warning if any before adding new one
