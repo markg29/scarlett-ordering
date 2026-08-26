@@ -1025,12 +1025,21 @@ function startQuickMode(){
 }
 function qmRender(){
   if(qmIndex>=qmItems.length){
-    // All done
-    const ov2=document.getElementById('qm-overlay');
-    if(ov2)ov2.style.display='none';
-    renderItems();
-    updateCheckProgress();
-    toast('Quick Mode tapos na! I-review ang iyong cart.','ok');
+    // All items reviewed
+    if(cart.length>0){
+      // Go straight to review
+      saveCartState();
+      const ov2=document.getElementById('qm-overlay');
+      if(ov2){ ov2.dataset.fromReview='1'; }
+      goToReview();
+    }else{
+      // Nothing ordered — just close QM
+      const ov2=document.getElementById('qm-overlay');
+      if(ov2) ov2.style.display='none';
+      renderItems();
+      updateCheckProgress();
+      toast('Walang naorder. Puwede kang bumalik para mag-add ng items.','warn');
+    }
     return;
   }
 
@@ -1153,9 +1162,11 @@ function qmDismissConfirm(){
 
 function qmGoReview(){
   saveCartState();
-  // Mark QM as the source so goBack() restores it instead of going to list
   const ov=document.getElementById('qm-overlay');
-  if(ov) ov.dataset.fromReview='1';
+  if(ov){
+    ov.dataset.fromReview='1'; // so goBack() restores QM
+    ov.style.display='none';   // hide QM so review page is visible
+  }
   goToReview();
 }
 
@@ -3437,6 +3448,7 @@ function goBack(){
     const qmOv=document.getElementById('qm-overlay');
     if(qmOv && qmOv.dataset.fromReview==='1'){
       qmOv.dataset.fromReview='';
+      qmOv.style.display='flex'; // restore QM overlay
       qmRender(); // refresh card + review bar
       return;
     }
