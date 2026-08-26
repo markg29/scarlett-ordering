@@ -3448,8 +3448,9 @@ function goBack(){
     const qmOv=document.getElementById('qm-overlay');
     if(qmOv && qmOv.dataset.fromReview==='1'){
       qmOv.dataset.fromReview='';
-      qmOv.style.display='flex'; // restore QM overlay
-      qmRender(); // refresh card + review bar
+      goPage('items'); // update curPage + hide review page
+      qmOv.style.display='flex'; // restore QM on top
+      qmRender();
       return;
     }
     const pg=document.getElementById('pg-items');
