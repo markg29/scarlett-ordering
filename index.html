@@ -1387,12 +1387,26 @@ function renderHome(){
 let pendingSupplierSwitch=null;
 
 function pickSupplier(id,name){
-  // Same supplier tapped again - open Quick Mode
+  // Same supplier tapped again
   if(activeSup && activeSup.id===id){
-    startQuickMode();
+    const qmOv=document.getElementById('qm-overlay');
+    const qmVisible=qmOv&&qmOv.style.display==='flex';
+    if(qmVisible){
+      // QM already open — just bring it to focus (do nothing)
+      return;
+    }
+    // QM not visible — open it, resume or restart
+    const myItems=allItems.filter(i=>i.supplierId===id);
+    const allDone=myItems.every(i=>cart.find(c=>c.itemId===i.id)||skippedItems.has(i.id));
+    if(allDone){
+      // All items reviewed — go to review instead
+      goToReview();
+    }else{
+      startQuickMode();
+    }
     return;
   }
-  // If switching to a DIFFERENT supplier while cart has unsaved items, warn first
+  // Switching to a DIFFERENT supplier while cart has unsaved items
   if(cart.length>0){
     pendingSupplierSwitch={id,name};
     const itemCount=cart.length;
@@ -3427,17 +3441,14 @@ loadOrderkoItemLinks();
 <!-- QUICK MODE OVERLAY (full screen, not a .page) -->
 <div id="qm-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:var(--surface);z-index:500;flex-direction:column;">
   <!-- Nav -->
-  <div style="height:var(--NAV);background:var(--white);border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 14px;gap:10px;flex-shrink:0;">
-    <button onclick="qmExit()" style="width:34px;height:34px;border-radius:10px;border:none;background:var(--surface);font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;">‹</button>
-    <div style="flex:1;">
-      <div style="font-size:16px;font-weight:700;">Quick Mode</div>
+  <div style="height:var(--NAV);background:var(--white);border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 10px;gap:6px;flex-shrink:0;">
+    <button onclick="qmExit()" style="width:34px;height:34px;border-radius:10px;border:none;background:var(--dangerbg);font-size:16px;font-weight:700;color:var(--danger);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;" title="Umalis sa Quick Mode">✕</button>
+    <div style="flex:1;min-width:0;">
+      <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="qm-sup-name"></div>
     </div>
-    <div id="qm-sup-name" style="font-size:12px;color:var(--ink3);font-weight:600;margin-right:6px;"></div>
-    <button id="qm-back-btn" onclick="qmBack()" style="display:none;padding:0 10px;height:34px;border-radius:999px;border:1.5px solid var(--line);background:var(--white);color:var(--ink2);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">‹ Bumalik</button>
-    <button onclick="openBorrowModal()" style="padding:0 10px;height:34px;border-radius:999px;border:1.5px solid var(--brand);background:var(--brandbg);color:var(--brand);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;">+ Ibang supplier</button>
-    <button onclick="switchToListView()" style="padding:0 12px;height:34px;border-radius:999px;border:1.5px solid var(--line);background:var(--white);color:var(--ink2);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:5px;">
-      📋 Tingnan Lahat
-    </button>
+    <button id="qm-back-btn" onclick="qmBack()" style="display:none;padding:0 8px;height:30px;border-radius:999px;border:1.5px solid var(--line);background:var(--white);color:var(--ink2);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;">‹ Prev</button>
+    <button onclick="openBorrowModal()" style="padding:0 8px;height:30px;border-radius:999px;border:1.5px solid var(--brand);background:var(--brandbg);color:var(--brand);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;">+Ibang sup.</button>
+    <button onclick="switchToListView()" style="padding:0 8px;height:30px;border-radius:999px;border:1.5px solid var(--line);background:var(--white);color:var(--ink2);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;">📋 Lista</button>
     <button onclick="openOverlay('mo-qm-legend')" style="width:28px;height:28px;border-radius:50%;border:1.5px solid var(--line);background:var(--white);color:var(--ink3);font-size:13px;font-weight:800;cursor:pointer;flex-shrink:0;">?</button>
   </div>
   <!-- Progress -->
@@ -3584,7 +3595,7 @@ loadOrderkoItemLinks();
         <div style="font-size:11px;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Mga Button sa Itaas</div>
         <div style="display:flex;flex-direction:column;gap:8px;">
           <div style="display:flex;align-items:center;gap:10px;">
-            <div style="width:32px;height:28px;border-radius:8px;border:1.5px solid var(--line);background:var(--white);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--ink2);flex-shrink:0;">✕</div>
+            <div style="width:34px;height:34px;border-radius:10px;background:var(--dangerbg);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:var(--danger);flex-shrink:0;">✕</div>
             <div style="font-size:13px;color:var(--ink2);">Umalis sa Quick Mode — babalik ka sa Home</div>
           </div>
           <div style="display:flex;align-items:center;gap:10px;">
