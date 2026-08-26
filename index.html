@@ -1061,7 +1061,10 @@ function qmRender(){
       </div>
       ${isSkipped?'<div style="background:var(--dangerbg);color:var(--danger);border-radius:10px;padding:8px 12px;font-size:12px;font-weight:700;">✕ Naka-skip na — mag-order ulit?</div>':''}
       ${inCart&&!isSkipped?`<div style="background:var(--okbg);color:var(--ok);border-radius:10px;padding:8px 12px;font-size:12px;font-weight:700;">✓ ${inCart.qty} ${item.unit} na nasa cart</div>`:''}
-    </div>`;
+    </div>
+    <button onclick="openBorrowModal()" style="width:100%;margin-top:12px;height:44px;border-radius:14px;border:1.5px dashed var(--brand);background:var(--brandbg);color:var(--brand);font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+      🏪 May kulang? Kumuha sa ibang supplier
+    </button>`;
 }
 
 function qmAdj(delta){
@@ -3447,7 +3450,6 @@ loadOrderkoItemLinks();
       <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="qm-sup-name"></div>
     </div>
     <button id="qm-back-btn" onclick="qmBack()" style="display:none;padding:0 8px;height:30px;border-radius:999px;border:1.5px solid var(--line);background:var(--white);color:var(--ink2);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;">‹ Prev</button>
-    <button onclick="openBorrowModal()" style="padding:0 8px;height:30px;border-radius:999px;border:1.5px solid var(--brand);background:var(--brandbg);color:var(--brand);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;">+Ibang sup.</button>
     <button onclick="switchToListView()" style="padding:0 8px;height:30px;border-radius:999px;border:1.5px solid var(--line);background:var(--white);color:var(--ink2);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;">📋 Lista</button>
     <button onclick="openOverlay('mo-qm-legend')" style="width:28px;height:28px;border-radius:50%;border:1.5px solid var(--line);background:var(--white);color:var(--ink3);font-size:13px;font-weight:800;cursor:pointer;flex-shrink:0;">?</button>
   </div>
@@ -3603,13 +3605,18 @@ loadOrderkoItemLinks();
             <div style="font-size:13px;color:var(--ink2);">Bumalik sa nakaraang item para baguhin</div>
           </div>
           <div style="display:flex;align-items:center;gap:10px;">
-            <div style="height:28px;padding:0 8px;border-radius:8px;border:1.5px solid var(--brand);background:var(--brandbg);display:flex;align-items:center;font-size:11px;font-weight:700;color:var(--brand);flex-shrink:0;white-space:nowrap;">+ Ibang supplier</div>
-            <div style="font-size:13px;color:var(--ink2);">Mag-add ng item mula sa ibang supplier</div>
-          </div>
-          <div style="display:flex;align-items:center;gap:10px;">
-            <div style="height:28px;padding:0 8px;border-radius:8px;border:1.5px solid var(--line);background:var(--white);display:flex;align-items:center;font-size:11px;font-weight:700;color:var(--ink2);flex-shrink:0;white-space:nowrap;">📋 Tingnan Lahat</div>
+            <div style="height:28px;padding:0 8px;border-radius:8px;border:1.5px solid var(--line);background:var(--white);display:flex;align-items:center;font-size:11px;font-weight:700;color:var(--ink2);flex-shrink:0;white-space:nowrap;">📋 Lista</div>
             <div style="font-size:13px;color:var(--ink2);">Tingnan ang lahat ng items sa isang listahan</div>
           </div>
+        </div>
+      </div>
+      <!-- Card button -->
+      <div style="padding:12px 14px;border-bottom:1px solid var(--line);background:var(--surface);">
+        <div style="font-size:11px;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Button sa Loob ng Card</div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="height:36px;padding:0 10px;border-radius:10px;border:1.5px dashed var(--brand);background:var(--brandbg);display:flex;align-items:center;font-size:11px;font-weight:700;color:var(--brand);flex-shrink:0;white-space:nowrap;">🏪 May kulang?</div>
+          <div style="font-size:13px;color:var(--ink2);">Mag-add ng item mula sa ibang supplier sa kasalukuyang order</div>
+        </div>
         </div>
       </div>
       <!-- Bottom buttons -->
