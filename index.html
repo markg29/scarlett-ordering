@@ -1026,15 +1026,14 @@ function startQuickMode(){
 function qmRender(){
   if(qmIndex>=qmItems.length){
     // All items reviewed
+    const ov2=document.getElementById('qm-overlay');
     if(cart.length>0){
-      // Go straight to review
+      // Hide QM first, then go to review
+      if(ov2) ov2.style.display='none';
       saveCartState();
-      const ov2=document.getElementById('qm-overlay');
-      if(ov2){ ov2.dataset.fromReview='1'; }
       goToReview();
     }else{
-      // Nothing ordered — just close QM
-      const ov2=document.getElementById('qm-overlay');
+      // Nothing ordered — close QM
       if(ov2) ov2.style.display='none';
       renderItems();
       updateCheckProgress();
@@ -3464,13 +3463,19 @@ function goPage(name){
 function goBack(){
   const p={items:'home',review:'items',success:'home'}[curPage]||'home';
   if(p==='items'){
-    // If we came from QM, restore QM instead of showing list mode
     const qmOv=document.getElementById('qm-overlay');
     if(qmOv && qmOv.dataset.fromReview==='1'){
       qmOv.dataset.fromReview='';
-      goPage('items'); // update curPage + hide review page
-      qmOv.style.display='flex'; // restore QM on top
-      qmRender();
+      goPage('items');
+      // Only restore QM if there are still items left to review
+      const allDone = qmItems.length>0 && qmIndex>=qmItems.length;
+      if(!allDone){
+        qmOv.style.display='flex';
+        qmRender();
+      }else{
+        // All done — stay on items list, render it
+        renderItems();
+      }
       return;
     }
     const pg=document.getElementById('pg-items');
