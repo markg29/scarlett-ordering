@@ -1082,11 +1082,11 @@ function qmRender(){
   if(_rc){ _rc.textContent=cart.length; }
 
 }
-  const item=qmItems[qmIndex];
 function qmAdj(delta){
-  const newQty=Math.max(0,qmCurrentQty+delta);
+  const item=qmItems[qmIndex];
+  if(!item) return;
   const maxQ=item.maxOrder>0?item.maxOrder:9999;
-  qmCurrentQty=Math.min(newQty,maxQ);
+  qmCurrentQty=Math.min(Math.max(0,qmCurrentQty+delta),maxQ);
   const el=document.getElementById('qm-qty');
   if(el){el.value=qmCurrentQty||'';el.style.borderColor=qmCurrentQty>0?'var(--ok)':'var(--line)';}
 }
