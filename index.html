@@ -1043,14 +1043,6 @@ function qmRender(){
   const backBtn=document.getElementById('qm-back-btn');
   if(backBtn) backBtn.style.display=qmIndex>0?'block':'none';
 
-  // Show review bar when cart has items
-  const reviewBar=document.getElementById('qm-review-bar');
-  const cartCount=document.getElementById('qm-cart-count');
-  if(reviewBar){
-    reviewBar.style.display=cart.length>0?'':'none';
-    if(cartCount) cartCount.textContent=cart.length;
-  }
-
   // Update progress
   const pct=Math.round(qmIndex/qmItems.length*100);
   document.getElementById('qm-counter').textContent=`${qmIndex+1} / ${qmItems.length}`;
@@ -1081,9 +1073,17 @@ function qmRender(){
     </div>
     <button onclick="openBorrowModal()" style="width:100%;margin-top:12px;height:44px;border-radius:14px;border:1.5px dashed var(--brand);background:var(--brandbg);color:var(--brand);font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
       🏪 May kulang? Kumuha sa ibang supplier
-    </button>`;
-}
+    </button>
+    `;
+  if(cart.length>0){
+    const rb=document.createElement('button');
+    rb.onclick=qmGoReview;
+    rb.style.cssText='width:100%;margin-top:8px;height:48px;border-radius:14px;border:2px solid var(--ok);background:var(--okbg);color:var(--ok);font-size:14px;font-weight:700;cursor:pointer;';
+    rb.textContent="📋 I-review ang Order ("+cart.length+" item"+(cart.length!==1?"s":"")+")";
+    document.getElementById('qm-card-wrap').appendChild(rb);
+  }
 
+}
 function qmAdj(delta){
   const item=qmItems[qmIndex];
   const newQty=Math.max(0,qmCurrentQty+delta);
@@ -3337,11 +3337,8 @@ function addAllBorrowedItems(){
     updateCheckProgress();
     const qmActive = document.getElementById('qm-overlay')?.style.display !== 'none';
     if(qmActive){
-      // Update review bar count in QM without full re-render
-      const reviewBar = document.getElementById('qm-review-bar');
-      const cartCount = document.getElementById('qm-cart-count');
-      if(reviewBar){ reviewBar.style.display=cart.length>0?'':'none'; }
-      if(cartCount) cartCount.textContent=cart.length;
+      // Re-render QM card to update review button count
+      qmRender();
     } else {
       renderItemsSilent();
     }
@@ -3615,12 +3612,6 @@ loadOrderkoItemLinks();
     <div style="display:flex;gap:10px;">
       <button onclick="qmSkip()" style="flex:1;height:52px;border-radius:14px;border:2px solid var(--danger);background:var(--white);color:var(--danger);font-size:14px;font-weight:700;cursor:pointer;">✕ Skip</button>
       <button onclick="qmNext()" style="flex:2;height:52px;border-radius:14px;border:none;background:var(--brand);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">Susunod →</button>
-    </div>
-    <!-- Review button — shown when cart has items -->
-    <div id="qm-review-bar" style="display:none;margin-top:10px;">
-      <button onclick="qmGoReview()" style="width:100%;height:44px;border-radius:14px;border:2px solid var(--ok);background:var(--okbg);color:var(--ok);font-size:14px;font-weight:700;cursor:pointer;">
-        📋 I-review ang Order (<span id="qm-cart-count">0</span> items)
-      </button>
     </div>
   </div>
 </div>
