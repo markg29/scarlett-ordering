@@ -3239,8 +3239,8 @@ function addAllBorrowedItems(){
   const entries = Object.entries(borrowCart).filter(([_,qty])=>qty>0);
   if(!entries.length){ toast('Walang napiling items!','err'); return; }
 
-  // Detect if we're in edit order mode (EQM overlay visible)
-  const eqmActive = document.getElementById('eqm-overlay')?.style.display === 'flex';
+  // Detect if we're in edit order mode — check if edit order modal is open
+  const eqmActive = document.getElementById('mo-edit-order')?.classList.contains('on') && editOrderId;
 
   entries.forEach(([itemId, qty])=>{
     const item = allItems.find(i=>i.id===itemId);
