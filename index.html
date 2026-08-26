@@ -1075,17 +1075,15 @@ function qmRender(){
       🏪 May kulang? Kumuha sa ibang supplier
     </button>
     `;
-  if(cart.length>0){
-    const rb=document.createElement('button');
-    rb.onclick=qmGoReview;
-    rb.style.cssText='width:100%;margin-top:8px;height:48px;border-radius:14px;border:2px solid var(--ok);background:var(--okbg);color:var(--ok);font-size:14px;font-weight:700;cursor:pointer;';
-    rb.textContent="📋 I-review ang Order ("+cart.length+" item"+(cart.length!==1?"s":"")+")";
-    document.getElementById('qm-card-wrap').appendChild(rb);
-  }
+  // Update review bar
+  const _rb=document.getElementById('qm-review-bar');
+  const _rc=document.getElementById('qm-cart-count');
+  if(_rb){ _rb.style.display=cart.length>0?'':'none'; }
+  if(_rc){ _rc.textContent=cart.length; }
 
 }
-function qmAdj(delta){
   const item=qmItems[qmIndex];
+function qmAdj(delta){
   const newQty=Math.max(0,qmCurrentQty+delta);
   const maxQ=item.maxOrder>0?item.maxOrder:9999;
   qmCurrentQty=Math.min(newQty,maxQ);
@@ -3612,6 +3610,9 @@ loadOrderkoItemLinks();
     <div style="display:flex;gap:10px;">
       <button onclick="qmSkip()" style="flex:1;height:52px;border-radius:14px;border:2px solid var(--danger);background:var(--white);color:var(--danger);font-size:14px;font-weight:700;cursor:pointer;">✕ Skip</button>
       <button onclick="qmNext()" style="flex:2;height:52px;border-radius:14px;border:none;background:var(--brand);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">Susunod →</button>
+    </div>
+    <div id="qm-review-bar" style="display:none;margin-top:10px;">
+      <button onclick="qmGoReview()" style="width:100%;height:48px;border-radius:14px;border:2px solid var(--ok);background:var(--okbg);color:var(--ok);font-size:14px;font-weight:700;cursor:pointer;">📋 I-review ang Order — <span id="qm-cart-count">0</span> items</button>
     </div>
   </div>
 </div>
