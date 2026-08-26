@@ -1780,8 +1780,11 @@ function renderReview(){
 // ════════════════════════════════════════
 // SAVE ORDER
 // ════════════════════════════════════════
+let _isSaving=false;
 async function saveOrder(){
   if(!activeSup||!cart.length){toast('Wala pang items!','err');return;}
+  if(_isSaving){toast('Nag-se-save pa...','warn');return;} // Block double-tap
+  _isSaving=true;
   const btn=document.getElementById('btn-save');
   btn.disabled=true;
   btn.innerHTML='<div class="spin w"></div> Nag-se-save...';
@@ -1800,6 +1803,7 @@ async function saveOrder(){
   }catch(e){
     toast('❌ Hindi na-save: '+e.message,'err');
   }finally{
+    _isSaving=false;
     btn.disabled=false;
     btn.innerHTML='💾 I-save ang Order';
   }
@@ -2283,6 +2287,10 @@ function openEditOrder(orderId){
   if(!existing.length){toast('Order not found','err');return;}
   editOrderSupplierId=existing[0].supplierId;
 
+  // Set activeSup so borrow modal knows which supplier to exclude
+  const sup=suppliers.find(s=>s.id===editOrderSupplierId);
+  if(sup) activeSup={id:sup.id,name:sup.name};
+
   // Build a map of items already in the order
   const inOrderMap={};
   existing.forEach(r=>inOrderMap[r.itemId]={
@@ -2359,7 +2367,10 @@ function eqmRender(){
         ${item.unit?`<span style="background:var(--brandbg);color:var(--brand);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;">${item.unit}</span>`:''}
         ${item.price>0?`<span style="background:#f0fdf4;color:var(--ok);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;">₱${item.price.toFixed(2)}</span>`:''}
       </div>
-    </div>`;
+    </div>
+    <button onclick="openBorrowModal()" style="width:100%;margin-top:10px;height:42px;border-radius:14px;border:1.5px dashed var(--brand);background:var(--brandbg);color:var(--brand);font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+      🏪 May kulang? Kumuha sa ibang supplier
+    </button>`;
   // Show/hide back button
   const eqmBackBtn=document.getElementById('eqm-back-btn');
   if(eqmBackBtn) eqmBackBtn.style.display=eqmIndex>0?'block':'none';
@@ -2480,6 +2491,14 @@ function eqmListUpdateNew(itemId, val, inputEl){
     const total=editOrderNewItems.length+Object.keys(editOrderChanges).length+editOrderDeletedItems.size;
     saveBtn.textContent=total>0?`💾 I-save (${total})`:'💾 I-save';
   }
+}
+
+function removeCart(index){
+  cart.splice(index,1);
+  saveCartState();
+  refreshFloat();
+  renderReview();
+  if(!cart.length) goPage('items');
 }
 
 function eqmListRemoveNew(itemId){
@@ -3196,24 +3215,43 @@ function addAllBorrowedItems(){
   const entries = Object.entries(borrowCart).filter(([_,qty])=>qty>0);
   if(!entries.length){ toast('Walang napiling items!','err'); return; }
 
+  // Detect if we're in edit order mode (EQM overlay visible)
+  const eqmActive = document.getElementById('eqm-overlay')?.style.display === 'flex';
+
   entries.forEach(([itemId, qty])=>{
     const item = allItems.find(i=>i.id===itemId);
     if(!item) return;
-    const existing = cart.findIndex(c=>c.itemId===itemId);
-    const entry = {itemId:item.id, name:item.name, unit:item.unit, price:item.price, qty, notes:''};
-    if(existing >= 0) cart[existing] = entry;
-    else cart.push(entry);
-    skippedItems.delete(itemId);
+
+    if(eqmActive){
+      // Edit order mode — add to editOrderNewItems
+      editOrderNewItems = editOrderNewItems.filter(n=>n.itemId!==itemId);
+      editOrderNewItems.push({itemId:item.id,name:item.name,unit:item.unit,price:item.price,qty});
+      // Also update eqmItems so it shows in list view
+      const existing = eqmItems.findIndex(e=>e.itemId===itemId);
+      if(existing>=0) eqmItems[existing].currentQty=qty;
+      else eqmItems.push({itemId:item.id,name:item.name,unit:item.unit,price:item.price,origQty:0,currentQty:qty,isExisting:false});
+    }else{
+      // Normal order mode — add to cart
+      const existingCart = cart.findIndex(c=>c.itemId===itemId);
+      const entry = {itemId:item.id, name:item.name, unit:item.unit, price:item.price, qty, notes:''};
+      if(existingCart >= 0) cart[existingCart] = entry;
+      else cart.push(entry);
+      skippedItems.delete(itemId);
+    }
   });
 
-  saveCartState();
-  refreshFloat();
-  updateCheckProgress();
   closeOverlay('mo-borrow');
   toast(`${entries.length} item${entries.length!==1?'s':''} naidagdag! ✅`,'ok');
-  // Only re-render items list if not in Quick Mode (QM has its own state)
-  const qmActive = document.getElementById('qm-overlay')?.style.display !== 'none';
-  if(!qmActive) renderItemsSilent();
+
+  if(eqmActive){
+    // Stay in EQM
+  }else{
+    saveCartState();
+    refreshFloat();
+    updateCheckProgress();
+    const qmActive = document.getElementById('qm-overlay')?.style.display !== 'none';
+    if(!qmActive) renderItemsSilent();
+  }
 }
 
 
@@ -3231,7 +3269,10 @@ function genItemId(){
 }
 function genOrderId(){
   const d=new Date();
-  return `ORD-${d.getFullYear().toString().slice(2)}${(d.getMonth()+1).toString().padStart(2,'0')}${d.getDate().toString().padStart(2,'0')}-${Math.floor(Math.random()*9000)+1000}`;
+  // Include milliseconds + random to make collision virtually impossible
+  const ms=d.getMilliseconds().toString().padStart(3,'0');
+  const rand=Math.floor(Math.random()*900)+100;
+  return `ORD-${d.getFullYear().toString().slice(2)}${(d.getMonth()+1).toString().padStart(2,'0')}${d.getDate().toString().padStart(2,'0')}-${ms}${rand}`;
 }
 
 // ════════════════════════════════════════
