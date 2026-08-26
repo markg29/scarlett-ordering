@@ -1152,10 +1152,10 @@ function qmDismissConfirm(){
 }
 
 function qmGoReview(){
-  // Save cart state and exit QM, then go to review
   saveCartState();
+  // Mark QM as the source so goBack() restores it instead of going to list
   const ov=document.getElementById('qm-overlay');
-  if(ov) ov.style.display='none';
+  if(ov) ov.dataset.fromReview='1';
   goToReview();
 }
 
@@ -3434,9 +3434,15 @@ function goPage(name){
   curPage=name;
 }
 function goBack(){
-
   const p={items:'home',review:'items',success:'home'}[curPage]||'home';
   if(p==='items'){
+    // If we came from QM, restore QM instead of showing list mode
+    const qmOv=document.getElementById('qm-overlay');
+    if(qmOv && qmOv.dataset.fromReview==='1'){
+      qmOv.dataset.fromReview='';
+      qmRender(); // refresh card + review bar
+      return;
+    }
     const pg=document.getElementById('pg-items');
     const saved=pg?pg.scrollTop:0;
     renderItems();
