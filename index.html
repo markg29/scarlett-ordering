@@ -377,9 +377,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--surface);color:
 .overlay.on{opacity:1;pointer-events:all;}
 /* Borrow and legend modals must sit ABOVE QM overlay (z:500) */
 #mo-borrow, #mo-qm-legend{z-index:700;backdrop-filter:none;-webkit-backdrop-filter:none;}
-#mo-borrow.on, #mo-qm-legend.on{opacity:1;pointer-events:all;}
-/* Overlays that appear on top of QM (z:500) need z:600 */
-#mo-borrow.on, #mo-qm-legend.on{z-index:600;}
+/* Borrow and legend sit above QM (z:500) */
 .sheet{
   background:var(--white);border-radius:26px 26px 0 0;
   padding:0 18px 36px;width:100%;
@@ -3588,58 +3586,69 @@ loadOrderkoItemLinks();
 
 <!-- QM LEGEND MODAL -->
 <div class="overlay" id="mo-qm-legend" onclick="closeOverlay('mo-qm-legend',event)">
-  <div class="sheet" style="max-height:80vh;">
+  <div class="sheet" style="max-height:85vh;">
     <div class="sheet-handle"></div>
-    <div class="sheet-title">📖 Gabay sa Quick Mode</div>
-    <div style="display:flex;flex-direction:column;gap:0;border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:16px;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
+      <div class="sheet-title" style="margin-bottom:0;flex:1;">📖 Gabay sa Quick Mode</div>
+      <button onclick="closeOverlay('mo-qm-legend')" style="width:30px;height:30px;border-radius:50%;border:1.5px solid var(--line);background:var(--surface);color:var(--ink3);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">✕</button>
+    </div>
+
+    <div style="border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:14px;">
+
       <!-- Nav buttons -->
       <div style="padding:12px 14px;border-bottom:1px solid var(--line);background:var(--surface);">
-        <div style="font-size:11px;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Mga Button sa Itaas</div>
-        <div style="display:flex;flex-direction:column;gap:8px;">
+        <div style="font-size:10px;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">Mga Button sa Itaas</div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
           <div style="display:flex;align-items:center;gap:10px;">
-            <div style="width:34px;height:34px;border-radius:10px;background:var(--dangerbg);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:var(--danger);flex-shrink:0;">✕</div>
-            <div style="font-size:13px;color:var(--ink2);">Umalis sa Quick Mode — babalik ka sa Home</div>
+            <div style="width:32px;height:32px;border-radius:9px;background:var(--dangerbg);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:var(--danger);flex-shrink:0;">✕</div>
+            <div style="font-size:13px;color:var(--ink2);">Umalis sa Quick Mode, babalik sa Home</div>
           </div>
           <div style="display:flex;align-items:center;gap:10px;">
-            <div style="height:28px;padding:0 8px;border-radius:8px;border:1.5px solid var(--line);background:var(--white);display:flex;align-items:center;font-size:11px;font-weight:700;color:var(--ink2);flex-shrink:0;white-space:nowrap;">‹ Bumalik</div>
-            <div style="font-size:13px;color:var(--ink2);">Bumalik sa nakaraang item para baguhin</div>
+            <div style="height:26px;padding:0 8px;border-radius:7px;border:1.5px solid var(--line);background:var(--white);display:flex;align-items:center;font-size:11px;font-weight:700;color:var(--ink2);flex-shrink:0;">‹ Prev</div>
+            <div style="font-size:13px;color:var(--ink2);">Bumalik sa nakaraang item para baguhin ang qty</div>
           </div>
           <div style="display:flex;align-items:center;gap:10px;">
-            <div style="height:28px;padding:0 8px;border-radius:8px;border:1.5px solid var(--line);background:var(--white);display:flex;align-items:center;font-size:11px;font-weight:700;color:var(--ink2);flex-shrink:0;white-space:nowrap;">📋 Lista</div>
+            <div style="height:26px;padding:0 8px;border-radius:7px;border:1.5px solid var(--line);background:var(--white);display:flex;align-items:center;font-size:11px;font-weight:700;color:var(--ink2);flex-shrink:0;">📋 Lista</div>
             <div style="font-size:13px;color:var(--ink2);">Tingnan ang lahat ng items sa isang listahan</div>
           </div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:26px;height:26px;border-radius:50%;border:1.5px solid var(--line);background:var(--white);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--ink3);flex-shrink:0;">?</div>
+            <div style="font-size:13px;color:var(--ink2);">Buksan ang gabay na ito ulit</div>
+          </div>
         </div>
       </div>
-      <!-- Card button -->
-      <div style="padding:12px 14px;border-bottom:1px solid var(--line);background:var(--surface);">
-        <div style="font-size:11px;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Button sa Loob ng Card</div>
+
+      <!-- Inside card button -->
+      <div style="padding:12px 14px;border-bottom:1px solid var(--line);background:var(--white);">
+        <div style="font-size:10px;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">Button sa Loob ng Card</div>
         <div style="display:flex;align-items:center;gap:10px;">
-          <div style="height:36px;padding:0 10px;border-radius:10px;border:1.5px dashed var(--brand);background:var(--brandbg);display:flex;align-items:center;font-size:11px;font-weight:700;color:var(--brand);flex-shrink:0;white-space:nowrap;">🏪 May kulang?</div>
-          <div style="font-size:13px;color:var(--ink2);">Mag-add ng item mula sa ibang supplier sa kasalukuyang order</div>
-        </div>
+          <div style="height:34px;padding:0 10px;border-radius:10px;border:1.5px dashed var(--brand);background:var(--brandbg);display:flex;align-items:center;font-size:11px;font-weight:700;color:var(--brand);flex-shrink:0;white-space:nowrap;">🏪 May kulang?</div>
+          <div style="font-size:13px;color:var(--ink2);">Kumuha ng item galing sa ibang supplier</div>
         </div>
       </div>
+
       <!-- Bottom buttons -->
       <div style="padding:12px 14px;background:var(--surface);">
-        <div style="font-size:11px;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Mga Button sa Ibaba</div>
-        <div style="display:flex;flex-direction:column;gap:8px;">
+        <div style="font-size:10px;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">Mga Button sa Ibaba</div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
           <div style="display:flex;align-items:center;gap:10px;">
-            <div style="height:36px;padding:0 14px;border-radius:12px;border:2px solid var(--danger);background:var(--white);display:flex;align-items:center;font-size:12px;font-weight:700;color:var(--danger);flex-shrink:0;white-space:nowrap;">✕ Skip</div>
-            <div style="font-size:13px;color:var(--ink2);">Wala tayong inoorder nito ngayon — lumipat sa susunod</div>
+            <div style="height:36px;padding:0 12px;border-radius:12px;border:2px solid var(--danger);background:var(--white);display:flex;align-items:center;font-size:12px;font-weight:700;color:var(--danger);flex-shrink:0;white-space:nowrap;">✕ Skip</div>
+            <div style="font-size:13px;color:var(--ink2);">Hindi inoorder ito ngayon, lumipat sa susunod</div>
           </div>
           <div style="display:flex;align-items:center;gap:10px;">
             <div style="height:36px;padding:0 14px;border-radius:12px;background:var(--brand);display:flex;align-items:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0;white-space:nowrap;">Susunod →</div>
-            <div style="font-size:13px;color:var(--ink2);">I-save ang qty na nilagay at lumipat sa susunod na item</div>
+            <div style="font-size:13px;color:var(--ink2);">I-save ang qty at pumunta sa susunod na item</div>
           </div>
         </div>
       </div>
+
     </div>
-    <div style="background:var(--okbg);border-radius:12px;padding:12px 14px;font-size:13px;color:var(--ok);">
-      💡 <strong>Tip:</strong> Kapag natapos ang lahat ng items, lalabas ang summary ng iyong order bago mag-save.
+
+    <div style="background:var(--okbg);border-radius:12px;padding:12px 14px;font-size:13px;color:#065f46;margin-bottom:14px;">
+      💡 <strong>Tip:</strong> Kapag natapos ang lahat ng items, pwede ka nang mag-review at mag-save ng order.
     </div>
-    <div style="margin-top:14px;">
-      <button onclick="closeOverlay('mo-qm-legend')" class="btn-primary">Okay, gets ko na!</button>
-    </div>
+
+    <button onclick="closeOverlay('mo-qm-legend')" class="btn-primary">Gets ko na! 👍</button>
   </div>
 </div>
 
