@@ -2269,48 +2269,24 @@ function openEditOrder(orderId){
   const sup=suppliers.find(s=>s.id===editOrderSupplierId);
   if(sup) activeSup={id:sup.id,name:sup.name};
 
-  // Build a map of items already in the order
+  // Build eqmItems for compatibility (used by eqmSave and borrow add)
   const inOrderMap={};
   existing.forEach(r=>inOrderMap[r.itemId]={
     itemId:r.itemId, name:r.itemName, unit:r.unit,
     price:r.price, origQty:r.qty, currentQty:r.qty, isExisting:true
   });
-
-  // All supplier items — existing order items first, then new items
   const supplierItems=allItems.filter(i=>i.supplierId===editOrderSupplierId);
   eqmItems=[
-    // Existing items first (already in order)
     ...supplierItems.filter(i=>inOrderMap[i.id]).map(i=>inOrderMap[i.id]),
-    // Then items not yet in order
     ...supplierItems.filter(i=>!inOrderMap[i.id]).map(i=>({
       itemId:i.id, name:i.name, unit:i.unit,
       price:i.price, origQty:0, currentQty:0, isExisting:false
     }))
   ];
 
-  eqmIndex=0;
-  eqmCurrentQty=eqmItems[0]?.currentQty||0;
-
-  // Show eqm-overlay
-  document.getElementById('eqm-order-id').textContent=orderId;
-  document.getElementById('eqm-sup-name').textContent=existing[0].supplierName;
-  // Reset controls to default (in case previous edit was at summary screen)
-  document.getElementById('eqm-controls').innerHTML=`
-    <div style="display:flex;gap:10px;margin-bottom:10px;">
-      <button onclick="eqmAdj(-1)" style="width:64px;height:64px;border-radius:16px;border:2px solid var(--line);background:var(--surface);font-size:30px;font-weight:300;color:var(--brand);cursor:pointer;">−</button>
-      <input id="eqm-qty" type="number" inputmode="numeric" min="0" placeholder="0"
-        style="flex:1;text-align:center;font-size:36px;font-weight:800;border:2px solid var(--line);border-radius:16px;padding:8px;font-family:inherit;color:var(--ink);background:var(--white);min-width:0;"
-        oninput="eqmQtyInput(this.value)"/>
-      <button onclick="eqmAdj(1)" style="width:64px;height:64px;border-radius:16px;border:2px solid var(--line);background:var(--surface);font-size:30px;font-weight:300;color:var(--brand);cursor:pointer;">+</button>
-    </div>
-    <div style="display:flex;gap:10px;">
-      <button id="eqm-del-btn" onclick="eqmDelete()" style="flex:1;height:52px;border-radius:14px;border:2px solid var(--danger);background:var(--white);color:var(--danger);font-size:13px;font-weight:700;cursor:pointer;">🗑 I-delete</button>
-      <button onclick="eqmNext()" style="flex:2;height:52px;border-radius:14px;border:none;background:var(--brand);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">Susunod →</button>
-    </div>`;
-  document.getElementById('eqm-bar').style.background='var(--brand)';
-  const ov=document.getElementById('eqm-overlay');
-  if(ov)ov.style.display='flex';
-  eqmRender();
+  // Open list view directly — no QM overlay
+  renderEditOrderList();
+  openOverlay('mo-edit-order');
 }
 
 // ════════════════════════════════════════
@@ -2359,6 +2335,69 @@ function eqmRender(){
     delBtn.style.display=item.isExisting?'':'none';
     delBtn.textContent=editOrderDeletedItems.has(item.itemId)?'↩ I-undo':'🗑 I-delete';
   }
+}
+
+function renderEditOrderList(){
+  const existing=allOrders.filter(r=>r.orderId===editOrderId);
+  if(!existing.length) return;
+
+  // Header info
+  document.getElementById('eo-info').innerHTML=
+    `<strong>${editOrderId}</strong> · ${existing[0].supplierName} · <span style="color:var(--ink3);">${existing[0].date}</span>`;
+
+  // Section 1: Existing items in order — styled like regular item rows
+  const existingItems=eqmItems.filter(i=>i.isExisting);
+  document.getElementById('eo-current-items').innerHTML=existingItems.length
+    ? existingItems.map(item=>{
+        const isDeleted=editOrderDeletedItems.has(item.itemId);
+        return `<div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line);${isDeleted?'background:var(--dangerbg);opacity:.7;':''}">
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:14px;font-weight:700;${isDeleted?'text-decoration:line-through;':''}">${item.name}</div>
+            <div style="display:flex;gap:5px;margin-top:3px;flex-wrap:wrap;align-items:center;">
+              ${item.unit?`<span style="background:var(--brandbg);color:var(--brand);border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;">${item.unit}</span>`:''}
+              ${item.price>0?`<span style="background:var(--okbg);color:var(--ok);border-radius:999px;padding:1px 7px;font-size:11px;font-weight:700;">₱${item.price.toFixed(2)}</span>`:''}
+              <span style="font-size:11px;color:var(--ink3);">Dati: ${item.origQty}</span>
+            </div>
+          </div>
+          ${isDeleted
+            ?`<button onclick="eqmListUndoDelete('${E(item.itemId)}')" style="height:32px;padding:0 10px;border-radius:9px;border:1.5px solid var(--line);background:var(--white);color:var(--ink2);font-size:12px;font-weight:700;cursor:pointer;">↩ Undo</button>`
+            :`<div style="display:flex;align-items:center;gap:5px;flex-shrink:0;">
+                <button onclick="eoEditAdj('${E(item.itemId)}',-1)" style="width:30px;height:30px;border-radius:9px;border:1.5px solid var(--line);background:var(--surface);font-size:17px;font-weight:700;color:var(--brand);cursor:pointer;">−</button>
+                <input type="number" id="eoqty-${E(item.itemId)}" value="${item.currentQty}" min="0" inputmode="numeric"
+                  style="width:42px;text-align:center;border:1.5px solid ${item.currentQty>0?'var(--ok)':'var(--line)'};border-radius:9px;padding:4px;font-size:14px;font-weight:700;"
+                  oninput="eqmListUpdate('${E(item.itemId)}',this.value)"/>
+                <button onclick="eoEditAdj('${E(item.itemId)}',1)" style="width:30px;height:30px;border-radius:9px;border:1.5px solid var(--line);background:var(--surface);font-size:17px;font-weight:700;color:var(--brand);cursor:pointer;">+</button>
+                <button onclick="eqmListDelete('${E(item.itemId)}')" style="width:30px;height:30px;border-radius:9px;border:none;background:var(--dangerbg);color:var(--danger);cursor:pointer;font-size:13px;flex-shrink:0;">🗑</button>
+              </div>`}
+        </div>`;
+      }).join('')
+    : '<div style="padding:14px;font-size:13px;color:var(--ink3);">Walang items</div>';
+
+  // Section 2: Add items (supplier items not in order + borrowed items)
+  eqmRenderAddItems('');
+  // Clear search
+  const searchEl=document.getElementById('eo-add-search');
+  if(searchEl) searchEl.value='';
+
+  // Update save button
+  updateEoSaveBtn();
+}
+
+function eoEditAdj(itemId, delta){
+  const el=document.getElementById('eoqty-'+itemId);
+  if(!el) return;
+  const v=Math.max(0,(parseInt(el.value)||0)+delta);
+  el.value=v;
+  el.style.borderColor=v>0?'var(--ok)':'var(--line)';
+  eqmListUpdate(itemId, v);
+}
+
+function updateEoSaveBtn(){
+  const btn=document.getElementById('eo-btn');
+  if(!btn) return;
+  const total=editOrderNewItems.length+Object.keys(editOrderChanges).length+editOrderDeletedItems.size;
+  btn.textContent=total>0?`💾 I-save (${total} changes)`:'💾 I-save';
+  btn.onclick=()=>eqmSave();
 }
 
 function eqmBack(){
@@ -2419,7 +2458,7 @@ function eqmListUndoDelete(itemId){
   editOrderDeletedItems.delete(itemId);
   const item=eqmItems.find(i=>i.itemId===itemId);
   if(item) item.currentQty=item.origQty;
-  eqmSwitchToList();
+  renderEditOrderList();
 }
 
 function eqmFilterAddItems(){
@@ -2463,12 +2502,7 @@ function eqmListUpdateNew(itemId, val, inputEl){
   item.currentQty=qty;
   editOrderNewItems=editOrderNewItems.filter(n=>n.itemId!==itemId);
   if(qty>0) editOrderNewItems.push({itemId:item.itemId,name:item.name,unit:item.unit,price:item.price,qty});
-  // Update save button count
-  const saveBtn=document.getElementById('eo-btn');
-  if(saveBtn){
-    const total=editOrderNewItems.length+Object.keys(editOrderChanges).length+editOrderDeletedItems.size;
-    saveBtn.textContent=total>0?`💾 I-save (${total})`:'💾 I-save';
-  }
+  updateEoSaveBtn();
 }
 
 function removeCart(index){
@@ -2493,6 +2527,7 @@ function eqmListUpdate(itemId, val){
   item.currentQty=qty;
   if(qty!==item.origQty) editOrderChanges[itemId]=qty;
   else delete editOrderChanges[itemId];
+  updateEoSaveBtn();
 }
 
 function eqmListDelete(itemId){
@@ -2500,7 +2535,7 @@ function eqmListDelete(itemId){
   if(!item) return;
   editOrderDeletedItems.add(itemId);
   item.currentQty=0;
-  eqmSwitchToList(); // re-render list
+  renderEditOrderList();
 }
 
 function eqmListBackToQM(){
@@ -3222,7 +3257,10 @@ function addAllBorrowedItems(){
   toast(`${entries.length} item${entries.length!==1?'s':''} naidagdag! ✅`,'ok');
 
   if(eqmActive){
-    // Stay in EQM
+    // Refresh the edit order list view
+    if(document.getElementById('mo-edit-order')?.classList.contains('on')){
+      renderEditOrderList();
+    }
   }else{
     saveCartState();
     refreshFloat();
@@ -3672,4 +3710,39 @@ loadOrderkoItemLinks();
 </div>
 
 </body>
-</html>
+</html><!-- EDIT ORDER MODAL -->
+<div class="overlay" id="mo-edit-order" onclick="closeOverlay('mo-edit-order',event)">
+  <div class="sheet" style="max-height:92vh;display:flex;flex-direction:column;padding-bottom:0;">
+    <!-- Header -->
+    <div style="padding:0 18px;flex-shrink:0;">
+      <div class="sheet-handle"></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+        <div style="flex:1;">
+          <div class="sheet-title" style="margin-bottom:0;">✏️ I-edit ang Order</div>
+          <div id="eo-info" style="font-size:12px;color:var(--ink3);margin-top:2px;"></div>
+        </div>
+        <button onclick="closeOverlay('mo-edit-order')" style="width:30px;height:30px;border-radius:50%;border:1.5px solid var(--line);background:var(--surface);color:var(--ink3);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">✕</button>
+      </div>
+    </div>
+
+    <!-- Scrollable content -->
+    <div style="flex:1;overflow-y:auto;padding:0 18px 16px;-webkit-overflow-scrolling:touch;">
+      <!-- Section 1: Items in order -->
+      <div style="font-size:11px;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Mga Item sa Order</div>
+      <div id="eo-current-items" style="background:var(--white);border-radius:14px;overflow:hidden;border:1px solid var(--line);margin-bottom:16px;"></div>
+
+      <!-- Section 2: Add items from supplier -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div style="font-size:11px;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;">Mag-add ng Items</div>
+        <button onclick="openBorrowModal()" style="height:28px;padding:0 10px;border-radius:999px;border:1.5px dashed var(--brand);background:var(--brandbg);color:var(--brand);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">🏪 Ibang supplier</button>
+      </div>
+      <input id="eo-add-search" class="f-inp" placeholder="🔍 Maghanap ng item..." oninput="eqmFilterAddItems()" style="margin-bottom:8px;"/>
+      <div id="eo-add-items" style="background:var(--white);border-radius:14px;overflow:hidden;border:1px solid var(--line);margin-bottom:14px;max-height:280px;overflow-y:auto;"></div>
+    </div>
+
+    <!-- Sticky save bar -->
+    <div style="padding:12px 18px 28px;background:var(--white);border-top:1px solid var(--line);flex-shrink:0;">
+      <button id="eo-btn" onclick="eqmSave()" style="width:100%;height:50px;border-radius:14px;border:none;background:var(--brand);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">💾 I-save</button>
+    </div>
+  </div>
+</div>
