@@ -1264,38 +1264,16 @@ async function loadAll(){
     renderHome();
     restoreCartState();
     if(activeSup) renderItems();
-    setConnStatus('ok'); // Show connected from cache while fresh data loads
+    setConnStatus('ok');
   }else{
-    // No cache — show skeleton loading UI so app doesn't look broken
-    const supScroll = document.getElementById('sup-scroll');
-    if(supScroll) supScroll.innerHTML = `<div class="sup-row-inner">${[1,2,3].map(()=>`
-      <div class="sup-chip" style="opacity:.5;pointer-events:none;">
-        <div class="sc-em" style="background:var(--line);border-radius:8px;width:28px;height:28px;"></div>
-        <div class="sc-info">
-          <div style="background:var(--line);border-radius:4px;height:12px;width:80px;margin-bottom:6px;"></div>
-          <div style="background:var(--line);border-radius:4px;height:10px;width:50px;"></div>
-        </div>
-      </div>`).join('')}</div>`;
-    const recentHome = document.getElementById('recent-home');
-    if(recentHome) recentHome.innerHTML = [1,2].map(()=>`
-      <div class="rc" style="opacity:.5;pointer-events:none;">
-        <div style="background:var(--line);border-radius:4px;height:11px;width:120px;margin-bottom:8px;"></div>
-        <div style="background:var(--line);border-radius:4px;height:14px;width:160px;margin-bottom:8px;"></div>
-        <div style="background:var(--line);border-radius:4px;height:11px;width:80px;"></div>
-      </div>`).join('');
-    // Show loading indicator in connection status
     setConnStatus('checking');
   }
 
-  // Fetch fresh data in background (60s timeout per call)
+  // Fetch fresh in background
   try{
-    const withTimeout = (promise, ms) => Promise.race([
-      promise,
-      new Promise((_,rej)=>setTimeout(()=>rej(new Error('Timeout')),ms))
-    ]);
     const [d, dInv] = await Promise.all([
-      withTimeout(apiGet({action:'getAll'}), 60000),
-      withTimeout(apiGet({action:'getInventory'}), 60000).catch(()=>({goods:[]}))
+      apiGet({action:'getAll'}),
+      apiGet({action:'getInventory'}).catch(()=>({goods:[]}))
     ]);
     suppliers=(d.suppliers||[]).map(r=>({id:String(r[0]||''),name:String(r[1]||''),logo:String(r[2]||'')})).filter(s=>s.id&&s.name);
     allItems=(d.items||[]).map(r=>({id:String(r[0]||''),supplierId:String(r[1]||''),name:String(r[2]||''),unit:String(r[3]||''),price:parseFloat(r[4])||0,maxOrder:r[5]!==''&&r[5]!==null&&r[5]!==undefined?parseInt(r[5])||0:0,imageUrl:String(r[6]||''),category:String(r[7]||'')})).filter(i=>i.id&&i.name);
@@ -1306,14 +1284,13 @@ async function loadAll(){
     renderHome();
     restoreCartState();
     if(activeSup) renderItems();
-    if(!cached) toast('Na-load na ✅','ok');
   }catch(e){
     setConnStatus('error');
     if(!cached){
-      toast('❌ '+e.message,'err');
-      document.getElementById('sup-scroll').innerHTML=`<div style="padding:16px 0;color:var(--danger);font-size:13px;padding-left:14px;">⚠️ Hindi ma-load. I-check ang internet.</div>`;
+      toast('❌ Hindi ma-load. I-check ang internet.','err');
+      const supEl=document.getElementById('sup-scroll');
+      if(supEl) supEl.innerHTML=`<div style="padding:16px 0;color:var(--danger);font-size:13px;padding-left:14px;">⚠️ Hindi ma-load. I-check ang internet.</div>`;
     }
-    // If we have cached data, silently fail — user sees cached content
   }
 }
 
