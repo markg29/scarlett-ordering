@@ -2671,8 +2671,12 @@ function eqmCancel(){
 }
 
 async function eqmSave(){
-  const btn=document.getElementById('eqm-save-btn');
-  if(btn){btn.disabled=true;btn.textContent='Nag-se-save...';}
+  const btn=document.getElementById('eqm-save-btn')||document.getElementById('eo-btn');
+  if(btn){
+    if(btn.disabled) return; // Already saving — block double-tap
+    btn.disabled=true;
+    btn.textContent='Nag-se-save...';
+  }
   try{
     if(Object.keys(editOrderChanges).length){
       await apiPost({action:'updateOrderItems',orderId:editOrderId,changes:editOrderChanges});
