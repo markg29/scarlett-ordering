@@ -1084,6 +1084,13 @@ function qmRender(){
       🏪 May kulang? Kumuha sa ibang supplier
     </button>
     `;
+  // Update Susunod button — change label on last item
+  const nextBtn=document.getElementById('qm-next-btn');
+  if(nextBtn){
+    const isLast=qmIndex>=qmItems.length-1;
+    nextBtn.textContent=isLast?'I-review ang Order ✓':'Susunod →';
+    nextBtn.style.background=isLast?'var(--ok)':'var(--brand)';
+  }
   // Update review bar
   const _rb=document.getElementById('qm-review-bar');
   const _rc=document.getElementById('qm-cart-count');
@@ -1113,15 +1120,24 @@ function qmQtyInput(val){
 
 function qmNext(){
   const item=qmItems[qmIndex];
+  const isLastItem = qmIndex >= qmItems.length - 1;
+
   // Read actual input value — mobile may not have fired oninput yet
   const qtyEl=document.getElementById('qm-qty');
   if(qtyEl && qtyEl.value!=='') qmCurrentQty=Math.max(0,parseFloat(qtyEl.value)||0);
-  // If qty is 0, must confirm — either skip or go back and add qty
+
+  // If qty is 0 on last item — just go to review (skip it and done)
   if(qmCurrentQty<=0){
-    // Remove existing warning if any before adding new one
+    if(isLastItem){
+      skippedItems.add(item.id);
+      saveCartState();
+      qmIndex++;
+      qmRender(); // will trigger goToReview since qmIndex >= qmItems.length
+      return;
+    }
+    // Not last item — show skip confirmation
     const existing=document.getElementById('qm-zero-confirm');
     if(existing)existing.remove();
-    // Show confirmation in card area
     document.getElementById('qm-card-wrap').innerHTML+=`
       <div id="qm-zero-confirm" style="margin-top:10px;background:var(--warnbg);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;">
         <div style="font-size:13px;font-weight:700;color:var(--warn);">⚠️ Wala kang nilagay na qty. I-skip ba ito?</div>
@@ -1132,6 +1148,7 @@ function qmNext(){
       </div>`;
     return;
   }
+
   // Has qty — add to cart
   skippedItems.delete(item.id);
   const existing=cart.findIndex(c=>c.itemId===item.id);
@@ -1142,7 +1159,7 @@ function qmNext(){
   refreshFloat();
   qmIndex++;
   qmCurrentQty=0;
-  qmRender();
+  qmRender(); // if last item, qmRender -> qmIndex>=length -> goToReview
 }
 
 function qmConfirmSkip(){
@@ -3628,7 +3645,7 @@ loadOrderkoItemLinks();
       </div>
       <div style="display:flex;gap:10px;margin-bottom:8px;">
         <button onclick="qmSkip()" style="flex:1;height:48px;border-radius:14px;border:2px solid var(--danger);background:var(--white);color:var(--danger);font-size:14px;font-weight:700;cursor:pointer;">✕ Skip</button>
-        <button onclick="qmNext()" style="flex:2;height:48px;border-radius:14px;border:none;background:var(--brand);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">Susunod →</button>
+        <button id="qm-next-btn" onclick="qmNext()" style="flex:2;height:48px;border-radius:14px;border:none;background:var(--brand);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">Susunod →</button>
       </div>
     </div>
     <div id="qm-review-bar" style="display:none;padding:0 16px 8px;">
