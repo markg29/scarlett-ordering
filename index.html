@@ -1265,6 +1265,7 @@ async function loadAll(){
     restoreCartState();
     if(activeSup) renderItems();
     setConnStatus('ok'); // Show connected from cache while fresh data loads
+  }else{
     // No cache — show skeleton loading UI so app doesn't look broken
     const supScroll = document.getElementById('sup-scroll');
     if(supScroll) supScroll.innerHTML = `<div class="sup-row-inner">${[1,2,3].map(()=>`
