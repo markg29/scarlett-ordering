@@ -3449,19 +3449,14 @@ function goBack(){
   if(p==='items'){
     const qmOv=document.getElementById('qm-overlay');
     const fromReview=qmOv?.dataset.fromReview;
-    if(fromReview==='mid'){
-      // Came from mid-QM review bar — restore QM
+    if(fromReview==='mid' || fromReview==='done'){
+      // Came from QM review — restore QM
       qmOv.dataset.fromReview='';
       goPage('items');
       qmOv.style.display='flex';
+      // Clamp qmIndex so qmRender doesn't auto-complete immediately
+      if(qmIndex >= qmItems.length) qmIndex = Math.max(0, qmItems.length - 1);
       qmRender();
-      return;
-    }
-    if(fromReview==='done'){
-      // Came from auto-complete — all items done, stay on list
-      qmOv.dataset.fromReview='';
-      goPage('items');
-      renderItems();
       return;
     }
     const pg=document.getElementById('pg-items');
