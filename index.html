@@ -1015,7 +1015,7 @@ function startQuickMode(){
   }
   qmCurrentQty=0;
   const ov=document.getElementById('qm-overlay');
-  if(ov)ov.style.display='flex';
+  if(ov){ ov.style.display='flex'; ov.dataset.fromReview=''; } // clear any list flag
   qmRender();
   // Auto-show legend on first ever visit
   if(!localStorage.getItem('qm_legend_seen')){
@@ -3449,12 +3449,20 @@ function goBack(){
   if(p==='items'){
     const qmOv=document.getElementById('qm-overlay');
     const fromReview=qmOv?.dataset.fromReview;
+    // Restore QM if it was active (fromReview flag set)
     if(fromReview==='mid' || fromReview==='done'){
-      // Came from QM review — restore QM
       qmOv.dataset.fromReview='';
       goPage('items');
       qmOv.style.display='flex';
-      // Clamp qmIndex so qmRender doesn't auto-complete immediately
+      if(qmIndex >= qmItems.length) qmIndex = Math.max(0, qmItems.length - 1);
+      qmRender();
+      return;
+    }
+    // No flag but QM session is active — restore QM
+    // Exception: 'list' means user explicitly chose list mode
+    if(activeSup && qmItems.length > 0 && qmOv && qmOv.style.display !== 'flex' && fromReview !== 'list'){
+      goPage('items');
+      qmOv.style.display='flex';
       if(qmIndex >= qmItems.length) qmIndex = Math.max(0, qmItems.length - 1);
       qmRender();
       return;
@@ -3469,15 +3477,16 @@ function goBack(){
 }
 
 function switchToListView(){
-  // Set items page active FIRST, then hide overlay
   renderItems();
   goPage('items');
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
   document.getElementById('tb-products')?.classList.add('on');
   refreshFloat();
-  // Hide overlay last so transition is smooth
   const ov=document.getElementById('qm-overlay');
-  if(ov)ov.style.display='none';
+  if(ov){
+    ov.style.display='none';
+    ov.dataset.fromReview='list'; // user explicitly chose list mode
+  }
 }
 
 function qmExit(){
