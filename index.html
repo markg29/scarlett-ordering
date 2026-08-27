@@ -1028,12 +1028,10 @@ function qmRender(){
     // All items reviewed
     const ov2=document.getElementById('qm-overlay');
     if(cart.length>0){
-      // Hide QM first, then go to review
-      if(ov2) ov2.style.display='none';
+      if(ov2){ ov2.style.display='none'; ov2.dataset.fromReview='done'; }
       saveCartState();
       goToReview();
     }else{
-      // Nothing ordered — close QM
       if(ov2) ov2.style.display='none';
       renderItems();
       updateCheckProgress();
@@ -1083,13 +1081,7 @@ function qmRender(){
       🏪 May kulang? Kumuha sa ibang supplier
     </button>
     `;
-  // Update Susunod button — change label on last item
-  const nextBtn=document.getElementById('qm-next-btn');
-  if(nextBtn){
-    const isLast=qmIndex>=qmItems.length-1;
-    nextBtn.textContent=isLast?'I-review ang Order ✓':'Susunod →';
-    nextBtn.style.background=isLast?'var(--ok)':'var(--brand)';
-  }
+  // Susunod button always stays as Susunod — review bar handles review navigation
   // Update review bar
   const _rb=document.getElementById('qm-review-bar');
   const _rc=document.getElementById('qm-cart-count');
@@ -1119,22 +1111,14 @@ function qmQtyInput(val){
 
 function qmNext(){
   const item=qmItems[qmIndex];
-  const isLastItem = qmIndex >= qmItems.length - 1;
 
   // Read actual input value — mobile may not have fired oninput yet
   const qtyEl=document.getElementById('qm-qty');
   if(qtyEl && qtyEl.value!=='') qmCurrentQty=Math.max(0,parseFloat(qtyEl.value)||0);
 
-  // If qty is 0 on last item — just go to review (skip it and done)
+  // If qty is 0 — show skip confirmation (same on all items including last)
   if(qmCurrentQty<=0){
-    if(isLastItem){
-      skippedItems.add(item.id);
-      saveCartState();
-      qmIndex++;
-      qmRender(); // will trigger goToReview since qmIndex >= qmItems.length
-      return;
-    }
-    // Not last item — show skip confirmation
+    // Show skip confirmation
     const existing=document.getElementById('qm-zero-confirm');
     if(existing)existing.remove();
     document.getElementById('qm-card-wrap').innerHTML+=`
@@ -1183,8 +1167,8 @@ function qmGoReview(){
   saveCartState();
   const ov=document.getElementById('qm-overlay');
   if(ov){
-    ov.dataset.fromReview='1'; // so goBack() restores QM
-    ov.style.display='none';   // hide QM so review page is visible
+    ov.dataset.fromReview='mid'; // mid-QM: goBack() will restore QM
+    ov.style.display='none';
   }
   goToReview();
 }
@@ -3464,18 +3448,20 @@ function goBack(){
   const p={items:'home',review:'items',success:'home'}[curPage]||'home';
   if(p==='items'){
     const qmOv=document.getElementById('qm-overlay');
-    if(qmOv && qmOv.dataset.fromReview==='1'){
+    const fromReview=qmOv?.dataset.fromReview;
+    if(fromReview==='mid'){
+      // Came from mid-QM review bar — restore QM
       qmOv.dataset.fromReview='';
       goPage('items');
-      // Only restore QM if there are still items left to review
-      const allDone = qmItems.length>0 && qmIndex>=qmItems.length;
-      if(!allDone){
-        qmOv.style.display='flex';
-        qmRender();
-      }else{
-        // All done — stay on items list, render it
-        renderItems();
-      }
+      qmOv.style.display='flex';
+      qmRender();
+      return;
+    }
+    if(fromReview==='done'){
+      // Came from auto-complete — all items done, stay on list
+      qmOv.dataset.fromReview='';
+      goPage('items');
+      renderItems();
       return;
     }
     const pg=document.getElementById('pg-items');
