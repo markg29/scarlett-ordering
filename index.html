@@ -1165,12 +1165,7 @@ function qmDismissConfirm(){
 
 function qmGoReview(){
   saveCartState();
-  const ov=document.getElementById('qm-overlay');
-  if(ov){
-    ov.dataset.fromReview='mid'; // mid-QM: goBack() will restore QM
-    ov.style.display='none';
-  }
-  goToReview();
+  goToReview(); // goToReview will set fromReview flag and hide QM if visible
 }
 
 function qmBack(){
@@ -1741,10 +1736,15 @@ function updateCheckProgress(){
 
 function goToReview(){
   if(!cart.length){toast('Wala pang items!','err');return;}
-  // Always allow going to review — save button will be disabled if not all checked
   renderReview();
   goPage('review');
   document.getElementById('float-bar').classList.add('hide');
+  // If QM was active, mark so goBack() restores it
+  const qmOv=document.getElementById('qm-overlay');
+  if(qmOv && qmOv.style.display==='flex'){
+    qmOv.dataset.fromReview='mid';
+    qmOv.style.display='none';
+  }
 }
 
 function allItemsChecked(){
