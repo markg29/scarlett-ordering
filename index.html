@@ -1887,12 +1887,13 @@ function newTxn(){
 // HISTORY — collapsible
 // ════════════════════════════════════════
 function renderHistorySilent(){
-  // Re-render history but preserve which cards are open
+  // Re-render history but preserve which cards are open and current search
   const openCards=new Set();
   document.querySelectorAll('.hcard.open').forEach(el=>{
     openCards.add(el.dataset.orderId);
   });
-  renderHistory();
+  const q=(document.getElementById('hist-search')?.value||'').trim().toLowerCase();
+  renderHistory(q);
   // Re-open cards that were open
   document.querySelectorAll('.hcard').forEach(el=>{
     if(openCards.has(el.dataset.orderId)){
@@ -1902,9 +1903,12 @@ function renderHistorySilent(){
 }
 
 function renderHistoryTab(){
+function getHistQ(){
+  return (document.getElementById('hist-search')?.value||'').trim().toLowerCase();
+}
+
 function filterHistory(){
-  const q=(document.getElementById('hist-search')?.value||'').trim().toLowerCase();
-  renderHistory(q);
+  renderHistory(getHistQ());
 }
 
   const el=document.getElementById('hist-search');
@@ -2060,7 +2064,7 @@ function toggleHCard(gi){
 }
 
 function openHistoryOrder(orderId){
-  renderHistory();
+  renderHistory(getHistQ());
   // Find card by data-order-id attribute — reliable regardless of render order
   setTimeout(()=>{
     const card=document.querySelector(`.hcard[data-order-id="${orderId}"]`);
@@ -2848,7 +2852,7 @@ async function eqmSave(){
     }
     const ov=document.getElementById('eqm-overlay');
     if(ov)ov.style.display='none';
-    renderHistory();
+    renderHistory(getHistQ());
     renderHome();
     showSaveSuccess('Order na-update!');
     editOrderChanges={};
@@ -2934,7 +2938,7 @@ async function saveEditOrder(){
     }
 
     closeOverlay('mo-edit-order');
-    renderHistory();
+    renderHistory(getHistQ());
     renderHome();
     const msg=[];
     if(hasChanges)msg.push(Object.keys(editOrderChanges).length+' item(s) na-update');
