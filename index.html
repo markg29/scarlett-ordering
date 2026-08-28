@@ -1903,6 +1903,11 @@ function renderHistorySilent(){
 }
 
 function renderHistoryTab(){
+  const el=document.getElementById('hist-search');
+  if(el) el.value='';
+  renderHistory();
+}
+
 function getHistQ(){
   return (document.getElementById('hist-search')?.value||'').trim().toLowerCase();
 }
@@ -1911,10 +1916,6 @@ function filterHistory(){
   renderHistory(getHistQ());
 }
 
-  const el=document.getElementById('hist-search');
-  if(el) el.value='';
-  renderHistory();
-}
 
 function renderHistory(q=''){
   const groups={};
