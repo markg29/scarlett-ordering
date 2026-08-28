@@ -615,7 +615,11 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--surface);color:
 
 <!-- PAGE: HISTORY -->
 <div class="page" id="pg-history">
-  <div id="hist-wrap" style="padding-top:6px;">
+  <div style="padding:10px 14px 4px;">
+    <input id="hist-search" class="f-inp" placeholder="🔍 Maghanap ng order o supplier..."
+      oninput="filterHistory()" style="margin:0;"/>
+  </div>
+  <div id="hist-wrap" style="padding-top:4px;">
     <div class="cload"><div class="spin"></div></div>
   </div>
 </div>
@@ -1897,13 +1901,32 @@ function renderHistorySilent(){
   });
 }
 
-function renderHistory(){
+function renderHistoryTab(){
+function filterHistory(){
+  const q=(document.getElementById('hist-search')?.value||'').trim().toLowerCase();
+  renderHistory(q);
+}
+
+  const el=document.getElementById('hist-search');
+  if(el) el.value='';
+  renderHistory();
+}
+
+function renderHistory(q=''){
   const groups={};
   [...allOrders].reverse().forEach(o=>{
     if(!groups[o.orderId])groups[o.orderId]={orderId:o.orderId,date:o.date,supplierName:o.supplierName,supplierId:o.supplierId,rows:[],globalNotes:''};
     groups[o.orderId].rows.push(o);
   });
-  const list=Object.values(groups);
+  let list=Object.values(groups);
+  if(q){
+    list=list.filter(g=>
+      g.orderId.toLowerCase().includes(q) ||
+      g.supplierName.toLowerCase().includes(q) ||
+      g.date.toLowerCase().includes(q) ||
+      g.rows.some(r=>r.itemName.toLowerCase().includes(q))
+    );
+  }
   if(!list.length){
     document.getElementById('hist-wrap').innerHTML=`<div class="empty"><div class="empty-ic">📋</div><div class="empty-h">Wala pang orders</div><div class="empty-b">Gumawa ng order para makita dito.</div></div>`;
     return;
@@ -2037,27 +2060,25 @@ function toggleHCard(gi){
 }
 
 function openHistoryOrder(orderId){
-  // Render history first, then find and expand the right card
   renderHistory();
-  // Find the group index for this orderId
-  const groups=[];
-  const seen=new Set();
-  allOrders.forEach(o=>{
-    if(!seen.has(o.orderId)){seen.add(o.orderId);groups.push(o.orderId);}
-  });
-  // Groups are rendered in reverse order
-  const reversed=[...groups].reverse();
-  const gi=reversed.indexOf(orderId);
-  if(gi>=0){
-    // Expand that card after a short delay for render to finish
-    setTimeout(()=>{
-      const el=document.getElementById('hc-'+gi);
-      if(el){
-        el.classList.add('open');
-        el.scrollIntoView({behavior:'smooth',block:'start'});
-      }
-    },100);
-  }
+  // Find card by data-order-id attribute — reliable regardless of render order
+  setTimeout(()=>{
+    const card=document.querySelector(`.hcard[data-order-id="${orderId}"]`);
+    if(card){
+      const gi=card.id.replace('hc-','');
+      // Close all first, then open target
+      document.querySelectorAll('.hcard.open').forEach(c=>{
+        c.classList.remove('open');
+        const id=c.id.replace('hc-','');
+        const chev=document.getElementById('hc-chev-'+id);
+        if(chev)chev.textContent='›';
+      });
+      card.classList.add('open');
+      const chev=document.getElementById('hc-chev-'+gi);
+      if(chev)chev.textContent='∨';
+      card.scrollIntoView({behavior:'smooth',block:'start'});
+    }
+  },100);
 }
 
 function askDeleteOrder(orderId){
@@ -3473,7 +3494,7 @@ function goTab(name){
     },300);
     return;
   }
-  if(name==='history')renderHistory();
+  if(name==='history')renderHistoryTab();
   if(name==='products'){
     initProductsPage();
     renderProducts();
