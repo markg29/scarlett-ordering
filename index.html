@@ -2565,8 +2565,12 @@ function removeCart(index){
   cart.splice(index,1);
   saveCartState();
   refreshFloat();
-  renderReview();
-  if(!cart.length) goPage('items');
+  if(!cart.length){
+    // Cart empty — go back the same way goBack() would
+    goBack();
+  }else{
+    renderReview();
+  }
 }
 
 function eqmRemoveAddedItem(itemId){
