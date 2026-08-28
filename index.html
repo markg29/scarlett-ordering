@@ -1359,8 +1359,7 @@ function renderHome(){
       : `<span style="font-size:24px;">${emoji}</span>`;
     html+=`<div class="sup-chip${sel?' sel':''}" onclick="pickSupplier('${E(s.id)}','${E(s.name)}')">
       ${cartIndicator}
-      <button class="sc-del" onclick="event.stopPropagation();askDel('sup','${E(s.id)}','${E(s.name)}')">✕</button>
-      <button style="position:absolute;top:8px;left:8px;width:20px;height:20px;border-radius:50%;background:var(--brandbg);color:var(--brand);border:2px solid var(--white);font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s;" class="sc-edit-btn" onclick="event.stopPropagation();openEditSupplier('${E(s.id)}')">✎</button>
+      <button style="position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;background:var(--surface);color:var(--ink3);border:1px solid var(--line);font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s;" class="sc-edit-btn" onclick="event.stopPropagation();openEditSupplier('${E(s.id)}')">✎</button>
       <div class="sc-em">${logoHtml}</div>
       <div class="sc-info">
         <div class="sc-id">${s.id}</div>
@@ -1387,10 +1386,27 @@ function renderHome(){
     rd.innerHTML=recent.map(o=>{
       const rows=allOrders.filter(r=>r.orderId===o.orderId);
       const total=rows.reduce((s,r)=>s+r.price*r.qty,0);
+      const hasPrice=rows.some(r=>r.price>0);
+      const sup=suppliers.find(s=>s.id===o.supplierId);
+      const logoHtml=sup?.logo
+        ?`<img src="${sup.logo}" style="width:42px;height:42px;border-radius:10px;object-fit:cover;flex-shrink:0;border:1px solid var(--line);" onerror="this.outerHTML='<div style=\'width:42px;height:42px;border-radius:10px;background:var(--brandbg);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;\'>🏭</div>'"/>`
+        :`<div style="width:42px;height:42px;border-radius:10px;background:var(--brandbg);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">🏭</div>`;
       return `<div class="rc" onclick="goTab('history');openHistoryOrder('${E(o.orderId)}')">
-        <div class="rc-head"><span class="rc-id">${o.orderId}</span><span class="rc-date">${o.date}</span></div>
-        <div class="rc-sup">${o.supplierName}</div>
-        <div class="rc-foot"><span class="rc-meta">${rows.length} items</span><span class="rc-amt">₱${total.toFixed(2)}</span></div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          ${logoHtml}
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+              <div class="rc-sup" style="margin:0;">${o.supplierName}</div>
+              ${hasPrice?`<span style="font-size:15px;font-weight:800;color:var(--ok);flex-shrink:0;">₱${total.toFixed(2)}</span>`:''}
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:3px;">
+              <span class="rc-id">${o.orderId}</span>
+              <span style="color:var(--ink3);font-size:10px;">·</span>
+              <span class="rc-date">${o.date}</span>
+            </div>
+            <div style="margin-top:4px;font-size:11px;color:var(--ink3);">${rows.length} items</div>
+          </div>
+        </div>
       </div>`;
     }).join('');
   }
