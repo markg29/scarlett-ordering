@@ -1884,31 +1884,8 @@ function renderHistorySilent(){
 function renderHistory(){
   const groups={};
   [...allOrders].reverse().forEach(o=>{
-    if(!groups[o.orderId])groups[o.orderId]={orderId:o.orderId,date:o.date,supplierName:o.supplierName,rows:[],globalNotes:''};
+    if(!groups[o.orderId])groups[o.orderId]={orderId:o.orderId,date:o.date,supplierName:o.supplierName,supplierId:o.supplierId,rows:[],globalNotes:''};
     groups[o.orderId].rows.push(o);
-  });
-  // After grouping, detect global notes:
-  // If a note appears in " | " suffix of any row, extract it
-  // If ALL rows have identical non-empty notes, that's the global note
-  Object.values(groups).forEach(g=>{
-    const notesWithSep = g.rows.filter(r=>r.notes&&r.notes.includes(' | '));
-    if(notesWithSep.length>0){
-      // Extract suffix after last " | "
-      const parts = notesWithSep[0].notes.split(' | ');
-      g.globalNotes = parts[parts.length-1].trim();
-    } else {
-      // Check if ALL rows have identical notes (= global note applied to all)
-      const nonEmpty = g.rows.filter(r=>r.notes&&r.notes.trim());
-      if(nonEmpty.length===g.rows.length&&g.rows.length>1){
-        const first = nonEmpty[0].notes.trim();
-        if(nonEmpty.every(r=>r.notes.trim()===first)){
-          g.globalNotes = first;
-        }
-      } else if(nonEmpty.length>0&&nonEmpty.length===g.rows.length){
-        // Single item order with notes — treat as per-item
-        g.globalNotes='';
-      }
-    }
   });
   const list=Object.values(groups);
   if(!list.length){
@@ -1916,9 +1893,10 @@ function renderHistory(){
     return;
   }
   document.getElementById('hist-wrap').innerHTML=
-    '<div style="padding-top:4px;">'+
+    '<div style="padding-top:8px;">'+
     list.map((g,gi)=>{
       const total=g.rows.reduce((s,r)=>s+r.price*r.qty,0);
+      const hasPrice=g.rows.some(r=>r.price>0);
       return `<div class="hcard" id="hc-${gi}" data-order-id="${g.orderId}">
         <div class="hcard-header" onclick="toggleHCard(${gi})">
           <div class="hcard-left">
@@ -1927,47 +1905,101 @@ function renderHistory(){
             <div class="hcard-date">${g.date}</div>
           </div>
           <div class="hcard-right">
-            <div class="hcard-amt">₱${total.toFixed(2)}</div>
+            ${hasPrice?`<div class="hcard-amt">₱${total.toFixed(2)}</div>`:''}
             <div class="hcard-cnt">${g.rows.length} items</div>
           </div>
-          <div class="hcard-chevron">›</div>
+          <div class="hcard-chevron" id="hc-chev-${gi}">›</div>
         </div>
         <div class="hcard-body">
-          ${g.rows.map(r=>`<div class="hcard-item" style="flex-direction:column;align-items:flex-start;gap:2px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;width:100%;">
-              <span class="hcard-iname">${r.itemName}</span>
-              <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
-                <span class="hcard-iqty">${r.qty} ${r.unit}</span>
-                <span class="hcard-isub">${r.price>0?'₱'+(r.price*r.qty).toFixed(2):''}</span>
+          <div style="border-bottom:1px solid var(--line);overflow:hidden;">
+            ${g.rows.map((r,ri)=>`
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 14px;border-bottom:1px solid var(--line);background:${ri%2===1?'var(--surface)':''};">
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:13px;font-weight:600;line-height:1.3;">${r.itemName}</div>
+                ${r.notes?`<div style="font-size:11px;color:var(--ink3);margin-top:2px;">📝 ${r.notes}</div>`:''}
               </div>
-            </div>
-            ${(()=>{
-              const rawNote=(r.notes||'').trim();
-              if(!rawNote)return '';
-              // Extract per-item part (before " | ")
-              const itemPart=rawNote.includes(' | ')?rawNote.split(' | ')[0].trim():rawNote;
-              if(!itemPart)return '';
-              // If this same note exists in ALL rows = it's global, skip showing per-item
-              const totalRows=g.rows.length;
-              const sameCount=g.rows.filter(x=>(x.notes||'').trim()===rawNote||(x.notes||'').trim()===itemPart).length;
-              if(sameCount===totalRows&&totalRows>1)return '';
-              return `<div style="font-size:11px;color:var(--ink3);font-style:italic;padding-left:2px;">📝 ${itemPart}</div>`;
-            })()}
-          </div>`).join('')}
-          ${g.globalNotes?`<div style="padding:8px 14px;font-size:12px;color:var(--ink3);font-style:italic;background:var(--warnbg);border-top:1px solid var(--line);">📝 Notes: ${g.globalNotes}</div>`:''}
+              <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;margin-left:10px;">
+                <span style="font-size:13px;font-weight:700;color:var(--ink);">${r.qty} <span style="font-size:11px;font-weight:600;color:var(--ink3);">${r.unit}</span></span>
+                ${r.price>0?`<span style="font-size:12px;font-weight:700;color:var(--ok);min-width:52px;text-align:right;">₱${(r.price*r.qty).toFixed(2)}</span>`:''}
+              </div>
+            </div>`).join('')}
+          </div>
           <div class="hcard-total-row">
-            <span class="hcard-total-label">Kabuuan</span>
-            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-              <button class="hcard-print-btn" onclick="printHistoryOrder('${g.orderId}')">🖨️</button>
-              <button class="hcard-print-btn" style="background:var(--brandbg);color:var(--brand);" onclick="openEditOrder('${g.orderId}')">✏️</button>
-              <button class="hcard-print-btn" style="background:var(--dangerbg);color:var(--danger);" onclick="askDeleteOrder('${g.orderId}')">🗑️</button>
-              <span class="hcard-total-val">₱${total.toFixed(2)}</span>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <button class="hcard-print-btn" onclick="shareOrder('${g.orderId}')" title="I-share">📤</button>
+              <button class="hcard-print-btn" onclick="printHistoryOrder('${g.orderId}')" title="I-print">🖨️</button>
+              <button class="hcard-print-btn" style="background:var(--brandbg);color:var(--brand);" onclick="openEditOrder('${g.orderId}')" title="I-edit">✏️</button>
+              <button class="hcard-print-btn" style="background:var(--dangerbg);color:var(--danger);" onclick="askDeleteOrder('${g.orderId}')" title="I-delete">🗑️</button>
             </div>
+            ${hasPrice?`<span class="hcard-total-val">₱${total.toFixed(2)}</span>`:`<span style="font-size:12px;color:var(--ink3);">${g.rows.length} items</span>`}
           </div>
         </div>
       </div>`;
     }).join('')+
     '</div>';
+}
+
+function toggleHCard(gi){
+  const el=document.getElementById('hc-'+gi);
+  if(!el)return;
+  el.classList.toggle('open');
+  const chev=document.getElementById('hc-chev-'+gi);
+  if(chev)chev.textContent=el.classList.contains('open')?'∨':'›';
+}
+
+function shareOrder(orderId){
+  const rows=allOrders.filter(r=>r.orderId===orderId);
+  if(!rows.length)return;
+  const g=rows[0];
+  const hasPrice=rows.some(r=>r.price>0);
+  const total=rows.reduce((s,r)=>s+r.price*r.qty,0);
+
+  let text='';
+  text+=`📋 ORDER — ${g.supplierName}\n`;
+  text+=`📅 ${g.date}\n`;
+  text+=`🆔 ${orderId}\n`;
+  text+='─'.repeat(28)+'\n';
+  rows.forEach((r,i)=>{
+    text+=`${(i+1).toString().padStart(2,'0')}. ${r.itemName}`;
+    text+=`\n    ${r.qty} ${r.unit}`;
+    if(r.price>0) text+=` × ₱${r.price.toFixed(2)} = ₱${(r.price*r.qty).toFixed(2)}`;
+    if(r.notes) text+=`\n    📝 ${r.notes}`;
+    text+='\n';
+  });
+  text+='─'.repeat(28)+'\n';
+  if(hasPrice) text+=`💰 Kabuuan: ₱${total.toFixed(2)}\n`;
+  text+=`📦 ${rows.length} items`;
+
+  if(navigator.share){
+    navigator.share({title:`Order — ${g.supplierName}`,text}).catch(()=>{});
+  }else{
+    navigator.clipboard.writeText(text).then(()=>{
+      toast('Nakopya ang order! I-paste sa Viber/WhatsApp ✅','ok');
+    }).catch(()=>{
+      // Fallback: show in modal
+      showShareModal(text);
+    });
+  }
+}
+
+function showShareModal(text){
+  // Simple fallback — show text in a textarea for manual copy
+  const existing=document.getElementById('share-modal-overlay');
+  if(existing)existing.remove();
+  const el=document.createElement('div');
+  el.id='share-modal-overlay';
+  el.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9000;display:flex;align-items:flex-end;';
+  el.innerHTML=`
+    <div style="width:100%;background:var(--white);border-radius:20px 20px 0 0;padding:20px 18px 36px;max-height:70vh;display:flex;flex-direction:column;">
+      <div style="font-size:16px;font-weight:800;margin-bottom:12px;">📋 I-copy ang Order</div>
+      <textarea readonly style="flex:1;min-height:200px;border:1.5px solid var(--line);border-radius:12px;padding:12px;font-size:13px;font-family:monospace;resize:none;">${text}</textarea>
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <button onclick="this.closest('#share-modal-overlay').remove()" style="flex:1;height:44px;border-radius:12px;border:1.5px solid var(--line);background:var(--white);font-size:14px;font-weight:700;cursor:pointer;">Isara</button>
+        <button onclick="this.previousElementSibling.previousElementSibling.select();document.execCommand('copy');toast('Nakopya! ✅','ok')" style="flex:2;height:44px;border-radius:12px;border:none;background:var(--brand);color:#fff;font-size:14px;font-weight:700;cursor:pointer;">📋 I-copy</button>
+      </div>
+    </div>`;
+  document.body.appendChild(el);
+  el.addEventListener('click',e=>{ if(e.target===el)el.remove(); });
 }
 
 function toggleHCard(gi){
