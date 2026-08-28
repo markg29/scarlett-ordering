@@ -1899,6 +1899,7 @@ function renderHistory(){
       const hasPrice=g.rows.some(r=>r.price>0);
       return `<div class="hcard" id="hc-${gi}" data-order-id="${g.orderId}">
         <div class="hcard-header" onclick="toggleHCard(${gi})">
+          ${(()=>{const sup=suppliers.find(s=>s.id===g.supplierId);const logo=sup?.logo;return logo?`<img src="${logo}" style="width:40px;height:40px;border-radius:10px;object-fit:cover;flex-shrink:0;border:1px solid var(--line);" onerror="this.style.display='none'"/>`:`<div style="width:40px;height:40px;border-radius:10px;background:var(--brandbg);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">🏭</div>`;})()}
           <div class="hcard-left">
             <div class="hcard-id">${g.orderId}</div>
             <div class="hcard-sup">${g.supplierName}</div>
@@ -1942,9 +1943,20 @@ function renderHistory(){
 function toggleHCard(gi){
   const el=document.getElementById('hc-'+gi);
   if(!el)return;
-  el.classList.toggle('open');
-  const chev=document.getElementById('hc-chev-'+gi);
-  if(chev)chev.textContent=el.classList.contains('open')?'∨':'›';
+  const wasOpen=el.classList.contains('open');
+  // Close all open cards first (accordion)
+  document.querySelectorAll('.hcard.open').forEach(card=>{
+    card.classList.remove('open');
+    const id=card.id.replace('hc-','');
+    const chev=document.getElementById('hc-chev-'+id);
+    if(chev)chev.textContent='›';
+  });
+  // Open clicked card if it was closed
+  if(!wasOpen){
+    el.classList.add('open');
+    const chev=document.getElementById('hc-chev-'+gi);
+    if(chev)chev.textContent='∨';
+  }
 }
 
 function shareOrder(orderId){
