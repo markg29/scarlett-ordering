@@ -2534,6 +2534,7 @@ function updateEoSaveBtn(){
   const btn=document.getElementById('eo-btn');
   if(!btn) return;
   const total=editOrderNewItems.length+Object.keys(editOrderChanges).length+editOrderDeletedItems.size;
+  btn.disabled=false; // always re-enable when state changes
   btn.textContent=total>0?`💾 I-save (${total} changes)`:'💾 I-save';
   btn.onclick=()=>eqmSave();
 }
@@ -2851,8 +2852,7 @@ async function eqmSave(){
         itemId:r[4],itemName:r[5],qty:r[6],unit:r[7],price:r[8],notes:r[9]
       }));
     }
-    const ov=document.getElementById('eqm-overlay');
-    if(ov)ov.style.display='none';
+    closeOverlay('mo-edit-order');
     renderHistory(getHistQ());
     renderHome();
     showSaveSuccess('Order na-update!');
@@ -2861,6 +2861,7 @@ async function eqmSave(){
     editOrderNewItems=[];
   }catch(e){
     toast('❌ '+e.message,'err');
+  }finally{
     if(btn){btn.disabled=false;btn.textContent='💾 I-save';}
   }
 }
