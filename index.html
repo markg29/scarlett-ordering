@@ -2396,18 +2396,26 @@ function openEditOrder(orderId){
   const sup=suppliers.find(s=>s.id===editOrderSupplierId);
   if(sup) activeSup={id:sup.id,name:sup.name};
 
-  // Build eqmItems for compatibility (used by eqmSave and borrow add)
+  // Build eqmItems — ALL items in the order first (any supplier), then remaining supplier items
   const inOrderMap={};
   existing.forEach(r=>inOrderMap[r.itemId]={
     itemId:r.itemId, name:r.itemName, unit:r.unit,
-    price:r.price, origQty:r.qty, currentQty:r.qty, isExisting:true
+    price:r.price, origQty:r.qty, currentQty:r.qty, isExisting:true,
+    supplierId:r.supplierId, supplierName:r.supplierName
   });
+
+  // Items from current supplier not yet in order
   const supplierItems=allItems.filter(i=>i.supplierId===editOrderSupplierId);
+  const supplierItemIds=new Set(supplierItems.map(i=>i.id));
+
   eqmItems=[
-    ...supplierItems.filter(i=>inOrderMap[i.id]).map(i=>inOrderMap[i.id]),
+    // All existing order items (any supplier)
+    ...Object.values(inOrderMap),
+    // Supplier items NOT in order (for adding)
     ...supplierItems.filter(i=>!inOrderMap[i.id]).map(i=>({
       itemId:i.id, name:i.name, unit:i.unit,
-      price:i.price, origQty:0, currentQty:0, isExisting:false
+      price:i.price, origQty:0, currentQty:0, isExisting:false,
+      supplierId:i.supplierId
     }))
   ];
 
