@@ -3677,10 +3677,23 @@ setInterval(silentRefresh, 60000); // 60s interval - enough for most use cases
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('./sw-ordering.js')
     .then(reg => {
-      // Send warmup message to SW if already active
       if(reg.active) reg.active.postMessage('warmup');
+      // Check for updates immediately on load
+      reg.update();
+      // Also check on page focus (when user switches back to tab/app)
+      document.addEventListener('visibilitychange', ()=>{
+        if(document.visibilityState==='visible') reg.update();
+      });
     })
     .catch(()=>{});
+  // Listen for messages from new SW
+  navigator.serviceWorker.addEventListener('message', e=>{
+    if(e.data?.type==='sw-updated') showUpdateToast();
+  });
+  // Check every 2 minutes (was 5)
+  navigator.serviceWorker.ready.then(reg=>{
+    setInterval(()=>reg.update(), 2*60*1000);
+  });
 }
 
 // Resume from background — restart if status is offline/checking
@@ -3700,17 +3713,6 @@ document.addEventListener('visibilitychange', ()=>{
 loadAll();
 loadOrderkoItemLinks();
 
-// ── Service Worker update detection ──────────────────────────────
-if('serviceWorker' in navigator){
-  navigator.serviceWorker.ready.then(reg=>{
-    // Check for updates every 5 minutes
-    setInterval(()=>reg.update(), 5*60*1000);
-  });
-  // Listen for message from new SW after it activates
-  navigator.serviceWorker.addEventListener('message', e=>{
-    if(e.data?.type==='sw-updated') showUpdateToast();
-  });
-}
 
 function showUpdateToast(){
   // Don't show twice
