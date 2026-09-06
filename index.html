@@ -3378,8 +3378,12 @@ function borrowSetQty(itemId, delta, isGlobal=false){
   if(newQty === 0) delete borrowCart[itemId];
   else borrowCart[itemId] = newQty;
   updateBorrowFloatBar();
-  if(isGlobal) renderBorrowGlobal();
-  else renderBorrowItems();
+  // Use requestAnimationFrame to delay re-render until after click is processed
+  // This prevents the DOM wipe from cancelling the tap on mobile
+  requestAnimationFrame(()=>{
+    if(isGlobal) renderBorrowGlobal();
+    else renderBorrowItems();
+  });
 }
 
 function borrowSetQtyDirect(itemId, val, isGlobal=false){
