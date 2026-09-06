@@ -2608,7 +2608,9 @@ function eqmFilterAddItems(){
 
 function eqmRenderAddItems(q=''){
   const search=q.toLowerCase().trim();
-  let list=eqmItems.filter(i=>!i.isExisting);
+  // Exclude items already added (in editOrderNewItems)
+  const addedIds=new Set(editOrderNewItems.map(n=>n.itemId));
+  let list=eqmItems.filter(i=>!i.isExisting && !addedIds.has(i.itemId));
   if(search) list=list.filter(i=>i.name.toLowerCase().includes(search)||(i.unit||'').toLowerCase().includes(search));
   const wrap=document.getElementById('eo-add-items');
   if(!wrap) return;
