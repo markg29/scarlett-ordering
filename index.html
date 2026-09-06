@@ -2477,10 +2477,11 @@ function renderEditOrderList(){
   const searchEl=document.getElementById('eo-add-search');
   if(searchEl) searchEl.value='';
 
-  // Current items section: existing order items + borrowed items with qty > 0
+  // Current items section: existing order items + any newly added items with qty > 0
+  const newItemIds = new Set(editOrderNewItems.map(n=>n.itemId));
   const orderedItems=[
     ...eqmItems.filter(i=>i.isExisting),
-    ...eqmItems.filter(i=>!i.isExisting && i.currentQty>0 && i.supplierId && i.supplierId!==editOrderSupplierId)
+    ...eqmItems.filter(i=>!i.isExisting && i.currentQty>0 && newItemIds.has(i.itemId))
   ];
   renderCurrentItemsList(orderedItems);
   updateEoSaveBtn();
@@ -2665,10 +2666,10 @@ function eqmRemoveAddedItem(itemId){
   if(item){ item.currentQty=0; }
   editOrderNewItems=editOrderNewItems.filter(n=>n.itemId!==itemId);
   updateEoSaveBtn();
-  // Re-render both sections
+  const newItemIds=new Set(editOrderNewItems.map(n=>n.itemId));
   const orderedItems=[
     ...eqmItems.filter(i=>i.isExisting),
-    ...eqmItems.filter(i=>!i.isExisting && i.currentQty>0 && i.supplierId && i.supplierId!==editOrderSupplierId)
+    ...eqmItems.filter(i=>!i.isExisting && i.currentQty>0 && newItemIds.has(i.itemId))
   ];
   renderCurrentItemsList(orderedItems);
   eqmRenderAddItems(document.getElementById('eo-add-search')?.value||'');
@@ -3432,9 +3433,10 @@ function addAllBorrowedItems(){
 
   if(eqmActive){
     // Re-render current items list to show borrowed items at top
+    const newItemIds2 = new Set(editOrderNewItems.map(n=>n.itemId));
     const orderedItems=[
       ...eqmItems.filter(i=>i.isExisting),
-      ...eqmItems.filter(i=>!i.isExisting && i.currentQty>0 && i.supplierId && i.supplierId!==editOrderSupplierId)
+      ...eqmItems.filter(i=>!i.isExisting && i.currentQty>0 && newItemIds2.has(i.itemId))
     ];
     renderCurrentItemsList(orderedItems);
     // Also re-render add section to remove items that are now in order
