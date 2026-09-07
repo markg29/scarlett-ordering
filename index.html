@@ -565,6 +565,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--surface);color:
   </div>
   <div style="padding:12px 14px 0;">
     <button class="btn-ghost" onclick="openAddItem()">➕ Magdagdag ng Item</button>
+    <button class="btn-ghost" onclick="openBatchEncode()" style="margin-top:8px;">📋 Batch Encode</button>
   </div>
 </div>
 
@@ -642,6 +643,13 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--surface);color:
     <div class="set-row">
       <div class="set-ic">ℹ️</div>
       <div class="set-body"><div class="set-name">OrderKo v4.0</div><div class="set-desc">Grocery Supplier Ordering System</div></div>
+    </div>
+  </div>
+  <div class="set-card">
+    <div class="set-row" onclick="openArrangeProducts()">
+      <div class="set-ic">🔀</div>
+      <div class="set-body"><div class="set-name">Ayusin ang Products</div><div class="set-desc">I-drag ang mga items para baguhin ang pagkakasunod</div></div>
+      <div class="set-ch">›</div>
     </div>
   </div>
 </div>
@@ -1316,7 +1324,7 @@ async function loadAll(){
       apiGet({action:'getInventory'}).catch(()=>({goods:[]}))
     ]);
     suppliers=(d.suppliers||[]).map(r=>({id:String(r[0]||''),name:String(r[1]||''),logo:String(r[2]||'')})).filter(s=>s.id&&s.name);
-    allItems=(d.items||[]).map(r=>({id:String(r[0]||''),supplierId:String(r[1]||''),name:String(r[2]||''),unit:String(r[3]||''),price:parseFloat(r[4])||0,maxOrder:r[5]!==''&&r[5]!==null&&r[5]!==undefined?parseInt(r[5])||0:0,imageUrl:String(r[6]||''),category:String(r[7]||'')})).filter(i=>i.id&&i.name);
+    allItems=(d.items||[]).map((r,idx)=>({id:String(r[0]||''),supplierId:String(r[1]||''),name:String(r[2]||''),unit:String(r[3]||''),price:parseFloat(r[4])||0,maxOrder:r[5]!==''&&r[5]!==null&&r[5]!==undefined?parseInt(r[5])||0:0,imageUrl:String(r[6]||''),category:String(r[7]||''),sortOrder:r[8]!==''&&r[8]!==null&&r[8]!==undefined?parseInt(r[8])||idx:idx})).filter(i=>i.id&&i.name);
     allOrders=(d.orders||[]).map(r=>({orderId:String(r[0]||''),date:fmtDate(r[1]),supplierId:String(r[2]||''),supplierName:String(r[3]||''),itemId:String(r[4]||''),itemName:String(r[5]||''),qty:parseFloat(r[6])||0,unit:String(r[7]||''),price:parseFloat(r[8])||0,notes:String(r[9]||'')})).filter(o=>o.orderId);
     inventoryGoods=(dInv.goods||[]).map(r=>({id:String(r[0]||''),name:String(r[1]||''),quantity:parseFloat(r[4])||0,minStockQty:parseFloat(r[5])||0,unit:String(r[7]||'')})).filter(g=>g.id&&g.name);
     setConnStatus('ok');
@@ -1503,7 +1511,8 @@ function renderItems(){
   document.getElementById('sup-pill').innerHTML=
     `${EM[idx<0?0:idx%EM.length]} <strong>${activeSup.name}</strong>`;
 
-  const myItems=allItems.filter(i=>i.supplierId===activeSup.id);
+  const myItems=allItems.filter(i=>i.supplierId===activeSup.id)
+    .sort((a,b)=>(a.sortOrder??999)-(b.sortOrder??999));
   // Build freqMap for 🔥 badge display only — no sorting
   const freqMap={};
   allOrders.forEach(o=>{
@@ -3468,7 +3477,240 @@ function addAllBorrowedItems(){
 
 
 // ════════════════════════════════════════
-// ID GENERATORS
+// ARRANGE PRODUCTS
+// ════════════════════════════════════════
+let arrangeItems = []; // current order during drag session
+let dragSrcIdx = null;
+
+function openArrangeProducts(){
+  // Populate supplier select
+  const sel = document.getElementById('arrange-sup-select');
+  sel.innerHTML = '<option value="">Piliin ang supplier...</option>' +
+    suppliers.map(s=>`<option value="${E(s.id)}">${s.name}</option>`).join('');
+  // Pre-select active supplier if any
+  if(activeSup) sel.value = activeSup.id;
+  document.getElementById('arrange-list').innerHTML = '';
+  openOverlay('mo-arrange');
+  if(activeSup) loadArrangeItems();
+}
+
+function loadArrangeItems(){
+  const supId = document.getElementById('arrange-sup-select').value;
+  if(!supId){ document.getElementById('arrange-list').innerHTML=''; return; }
+  arrangeItems = allItems
+    .filter(i=>i.supplierId===supId)
+    .sort((a,b)=>(a.sortOrder??999)-(b.sortOrder??999));
+  renderArrangeList();
+}
+
+function renderArrangeList(){
+  const wrap = document.getElementById('arrange-list');
+  if(!arrangeItems.length){
+    wrap.innerHTML='<div style="padding:20px;text-align:center;color:var(--ink3);">Walang items</div>';
+    return;
+  }
+  wrap.innerHTML = arrangeItems.map((item,i)=>`
+    <div id="arr-${i}" draggable="true"
+      ondragstart="arrDragStart(event,${i})"
+      ondragover="arrDragOver(event,${i})"
+      ondragend="arrDragEnd()"
+      ontouchstart="arrTouchStart(event,${i})"
+      ontouchmove="arrTouchMove(event)"
+      ontouchend="arrTouchEnd(event)"
+      style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--white);border-radius:12px;margin-bottom:6px;border:1.5px solid var(--line);cursor:grab;user-select:none;-webkit-user-select:none;transition:background .1s;">
+      <div style="color:var(--ink3);font-size:18px;flex-shrink:0;">☰</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:600;line-height:1.3;">${item.name}</div>
+        <div style="font-size:11px;color:var(--ink3);margin-top:2px;">${item.unit||''} ${item.category?'· '+item.category:''}</div>
+      </div>
+      <div style="font-size:11px;font-weight:700;color:var(--ink3);flex-shrink:0;">#${i+1}</div>
+    </div>`).join('');
+}
+
+// Desktop drag-and-drop
+function arrDragStart(e, idx){
+  dragSrcIdx = idx;
+  e.dataTransfer.effectAllowed = 'move';
+  document.getElementById('arr-'+idx).style.opacity = '0.5';
+}
+
+function arrDragOver(e, idx){
+  e.preventDefault();
+  if(dragSrcIdx === null || dragSrcIdx === idx) return;
+  const moved = arrangeItems.splice(dragSrcIdx, 1)[0];
+  arrangeItems.splice(idx, 0, moved);
+  dragSrcIdx = idx;
+  renderArrangeList();
+}
+
+function arrDragEnd(){
+  dragSrcIdx = null;
+  renderArrangeList();
+}
+
+// Mobile touch drag-and-drop
+let touchSrcIdx = null;
+let touchClone = null;
+let touchStartY = 0;
+
+function arrTouchStart(e, idx){
+  touchSrcIdx = idx;
+  touchStartY = e.touches[0].clientY;
+  const el = document.getElementById('arr-'+idx);
+  el.style.opacity = '0.5';
+  // Create visual clone
+  touchClone = el.cloneNode(true);
+  touchClone.style.cssText += ';position:fixed;left:18px;right:18px;z-index:9999;pointer-events:none;opacity:0.9;box-shadow:0 8px 24px rgba(0,0,0,.2);';
+  touchClone.style.top = el.getBoundingClientRect().top + 'px';
+  document.body.appendChild(touchClone);
+}
+
+function arrTouchMove(e){
+  if(touchSrcIdx===null) return;
+  e.preventDefault();
+  const y = e.touches[0].clientY;
+  if(touchClone) touchClone.style.top = (y - 30) + 'px';
+  // Find which item we're hovering over
+  const wrap = document.getElementById('arrange-list');
+  const items = wrap.querySelectorAll('[id^="arr-"]');
+  items.forEach((el, i)=>{
+    const rect = el.getBoundingClientRect();
+    if(y >= rect.top && y <= rect.bottom && i !== touchSrcIdx){
+      const moved = arrangeItems.splice(touchSrcIdx, 1)[0];
+      arrangeItems.splice(i, 0, moved);
+      touchSrcIdx = i;
+      renderArrangeList();
+      // Re-apply opacity to dragged item
+      const newEl = document.getElementById('arr-'+i);
+      if(newEl) newEl.style.opacity='0.5';
+    }
+  });
+}
+
+function arrTouchEnd(e){
+  if(touchClone){ touchClone.remove(); touchClone=null; }
+  touchSrcIdx = null;
+  renderArrangeList();
+}
+
+async function saveArrangeOrder(){
+  if(!arrangeItems.length){toast('Walang items','err');return;}
+  const btn = document.getElementById('arrange-save-btn');
+  btn.disabled = true;
+  btn.textContent = 'Nag-se-save...';
+  try{
+    const updates = arrangeItems.map((item,i)=>({id:item.id, sortOrder:i+1}));
+    const res = await apiPost({action:'updateItemOrder', updates});
+    if(!res.ok) throw new Error(res.error||'Failed');
+    // Update local allItems sortOrder
+    updates.forEach(u=>{
+      const item = allItems.find(i=>i.id===u.id);
+      if(item) item.sortOrder = u.sortOrder;
+    });
+    // Persist to cache so sort survives refresh
+    saveDataCache({suppliers, items:allItems.map(i=>[i.id,i.supplierId,i.name,i.unit,i.price,i.maxOrder,i.imageUrl,i.category,i.sortOrder??'']), orders:allOrders}, {goods:inventoryGoods});
+    closeOverlay('mo-arrange');
+    renderItems();
+    toast('Na-save ang order ng items ✅','ok');
+  }catch(e){
+    toast('❌ '+e.message,'err');
+  }finally{
+    btn.disabled=false;
+    btn.textContent='💾 I-save ang Order';
+  }
+}
+
+
+// ════════════════════════════════════════
+let batchRowCount = 0;
+
+function openBatchEncode(){
+  if(!activeSup){toast('Pumili muna ng supplier','err');return;}
+  batchRowCount = 0;
+  document.getElementById('batch-sup-label').textContent = `📦 Supplier: ${activeSup.name}`;
+  document.getElementById('batch-rows').innerHTML = '';
+  // Start with 5 empty rows
+  for(let i=0;i<5;i++) addBatchRow();
+  openOverlay('mo-batch');
+}
+
+function addBatchRow(){
+  batchRowCount++;
+  const id = batchRowCount;
+  const wrap = document.getElementById('batch-rows');
+  const row = document.createElement('div');
+  row.id = `brow-${id}`;
+  row.style.cssText = 'display:grid;grid-template-columns:2fr 80px 80px 70px 1fr 28px;gap:4px;align-items:center;';
+  row.innerHTML = `
+    <input class="f-inp" placeholder="Item name..." id="bn-${id}" style="margin:0;font-size:12px;padding:6px 8px;"/>
+    <input class="f-inp" placeholder="PCS" id="bu-${id}" style="margin:0;font-size:12px;padding:6px 8px;"/>
+    <input class="f-inp" type="number" inputmode="decimal" placeholder="0.00" id="bp-${id}" style="margin:0;font-size:12px;padding:6px 8px;"/>
+    <input class="f-inp" type="number" inputmode="numeric" placeholder="0" id="bm-${id}" style="margin:0;font-size:12px;padding:6px 8px;"/>
+    <input class="f-inp" placeholder="Category" id="bc-${id}" style="margin:0;font-size:12px;padding:6px 8px;"/>
+    <button onclick="removeBatchRow(${id})" style="width:26px;height:26px;border-radius:7px;border:none;background:var(--dangerbg);color:var(--danger);font-size:13px;cursor:pointer;flex-shrink:0;">✕</button>
+  `;
+  wrap.appendChild(row);
+  // Focus first empty name field
+  setTimeout(()=>row.querySelector('input')?.focus(), 50);
+}
+
+function removeBatchRow(id){
+  document.getElementById(`brow-${id}`)?.remove();
+}
+
+async function saveBatchItems(){
+  if(!activeSup){toast('Walang supplier','err');return;}
+  const btn = document.getElementById('batch-save-btn');
+
+  // Collect all rows with at least a name
+  const rows = [];
+  let maxNum = allItems.reduce((max,i)=>{
+    const m=i.id.match(/ITM-(\d+)/);
+    return m?Math.max(max,parseInt(m[1])):max;
+  },0);
+
+  document.querySelectorAll('#batch-rows > div[id^="brow-"]').forEach(row=>{
+    const id_n = row.id.replace('brow-','');
+    const name = document.getElementById(`bn-${id_n}`)?.value?.trim();
+    if(!name) return; // skip empty rows
+    const unit = document.getElementById(`bu-${id_n}`)?.value?.trim()||'';
+    const price = parseFloat(document.getElementById(`bp-${id_n}`)?.value)||0;
+    const max = parseInt(document.getElementById(`bm-${id_n}`)?.value)||0;
+    const cat = document.getElementById(`bc-${id_n}`)?.value?.trim()||'';
+    maxNum++;
+    const itemId = `ITM-${maxNum.toString().padStart(4,'0')}`;
+    rows.push({id:itemId, supplierId:activeSup.id, name, unit, price, maxOrder:max, imageUrl:'', category:cat});
+  });
+
+  if(!rows.length){toast('Walang items na nai-encode','err');return;}
+
+  btn.disabled=true;
+  btn.textContent=`Nag-se-save ng ${rows.length} items...`;
+
+  try{
+    const res = await apiPost({action:'batchAddItems', supplierId:activeSup.id, items:rows});
+    if(!res.ok) throw new Error(res.error||'Save failed');
+
+    // Update local data
+    rows.forEach(r=>{
+      allItems.push({id:r.id, supplierId:r.supplierId, name:r.name,
+        unit:r.unit, price:r.price, maxOrder:r.maxOrder, imageUrl:'', category:r.category});
+    });
+    saveDataCache({suppliers, items:allItems.map(i=>[i.id,i.supplierId,i.name,i.unit,i.price,i.maxOrder,i.imageUrl,i.category,i.sortOrder??'']), orders:allOrders}, {goods:inventoryGoods});
+
+    closeOverlay('mo-batch');
+    renderItems();
+    renderHome();
+    toast(`${rows.length} items na-save! ✅`,'ok');
+  }catch(e){
+    toast('❌ '+e.message,'err');
+  }finally{
+    btn.disabled=false;
+    btn.textContent='💾 I-save ang Lahat';
+  }
+}
+
+
 // ════════════════════════════════════════
 function genSupId(){return `SUP-${(suppliers.length+1).toString().padStart(3,'0')}`;}
 function genItemId(){
@@ -3671,7 +3913,7 @@ async function silentRefresh(){
       apiGet({action:'getInventory'}).catch(()=>({goods:[]})) // soft-fail if Scarlett not set up yet
     ]);
     suppliers=(d.suppliers||[]).map(r=>({id:String(r[0]||''),name:String(r[1]||''),logo:String(r[2]||'')})).filter(s=>s.id&&s.name);
-    allItems=(d.items||[]).map(r=>({id:String(r[0]||''),supplierId:String(r[1]||''),name:String(r[2]||''),unit:String(r[3]||''),price:parseFloat(r[4])||0,maxOrder:r[5]!==''&&r[5]!==null&&r[5]!==undefined?parseInt(r[5])||0:0,imageUrl:String(r[6]||''),category:String(r[7]||'')})).filter(i=>i.id&&i.name);
+    allItems=(d.items||[]).map((r,idx)=>({id:String(r[0]||''),supplierId:String(r[1]||''),name:String(r[2]||''),unit:String(r[3]||''),price:parseFloat(r[4])||0,maxOrder:r[5]!==''&&r[5]!==null&&r[5]!==undefined?parseInt(r[5])||0:0,imageUrl:String(r[6]||''),category:String(r[7]||''),sortOrder:r[8]!==''&&r[8]!==null&&r[8]!==undefined?parseInt(r[8])||idx:idx})).filter(i=>i.id&&i.name);
     allOrders=(d.orders||[]).map(r=>({orderId:String(r[0]||''),date:fmtDate(r[1]),supplierId:String(r[2]||''),supplierName:String(r[3]||''),itemId:String(r[4]||''),itemName:String(r[5]||''),qty:parseFloat(r[6])||0,unit:String(r[7]||''),price:parseFloat(r[8])||0,notes:String(r[9]||'')})).filter(o=>o.orderId);
     inventoryGoods=(dInv.goods||[]).map(r=>({id:String(r[0]||''),name:String(r[1]||''),quantity:parseFloat(r[4])||0,minStockQty:parseFloat(r[5])||0,unit:String(r[7]||'')})).filter(g=>g.id&&g.name);
     if(curPage==='home')renderHome();
@@ -3961,6 +4203,63 @@ function showUpdateToast(){
     </div>
 
     <button onclick="closeOverlay('mo-qm-legend')" class="btn-primary">Gets ko na! 👍</button>
+  </div>
+</div>
+
+<!-- MODAL: BATCH ENCODE ITEMS -->
+<div class="overlay" id="mo-batch" onclick="closeOverlay('mo-batch',event)">
+  <div class="sheet" style="max-height:92vh;display:flex;flex-direction:column;padding-bottom:0;">
+    <div style="padding:0 18px;flex-shrink:0;">
+      <div class="sheet-handle"></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+        <div class="sheet-title" style="margin-bottom:0;flex:1;">📋 Batch Encode ng Items</div>
+        <button onclick="closeOverlay('mo-batch')" style="width:30px;height:30px;border-radius:50%;border:1.5px solid var(--line);background:var(--surface);color:var(--ink3);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">✕</button>
+      </div>
+      <div id="batch-sup-label" style="font-size:13px;font-weight:700;color:var(--brand);margin-bottom:12px;"></div>
+    </div>
+
+    <!-- Table header -->
+    <div style="display:grid;grid-template-columns:2fr 80px 80px 70px 1fr 28px;gap:4px;padding:6px 18px;background:var(--surface);border-top:1px solid var(--line);border-bottom:1px solid var(--line);flex-shrink:0;">
+      <div style="font-size:10px;font-weight:800;color:var(--ink3);text-transform:uppercase;">Item Name</div>
+      <div style="font-size:10px;font-weight:800;color:var(--ink3);text-transform:uppercase;">Unit</div>
+      <div style="font-size:10px;font-weight:800;color:var(--ink3);text-transform:uppercase;">Price</div>
+      <div style="font-size:10px;font-weight:800;color:var(--ink3);text-transform:uppercase;">Max</div>
+      <div style="font-size:10px;font-weight:800;color:var(--ink3);text-transform:uppercase;">Category</div>
+      <div></div>
+    </div>
+
+    <!-- Scrollable rows -->
+    <div id="batch-rows" style="flex:1;overflow-y:auto;padding:8px 18px;display:flex;flex-direction:column;gap:6px;-webkit-overflow-scrolling:touch;"></div>
+
+    <!-- Footer -->
+    <div style="padding:10px 18px 28px;background:var(--white);border-top:1px solid var(--line);flex-shrink:0;">
+      <button onclick="addBatchRow()" style="width:100%;height:38px;border-radius:12px;border:1.5px dashed var(--brand);background:var(--brandbg);color:var(--brand);font-size:13px;font-weight:700;cursor:pointer;margin-bottom:10px;">+ Dagdag na Row</button>
+      <button id="batch-save-btn" onclick="saveBatchItems()" style="width:100%;height:50px;border-radius:14px;border:none;background:var(--brand);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">💾 I-save ang Lahat</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: ARRANGE PRODUCTS -->
+<div class="overlay" id="mo-arrange" onclick="closeOverlay('mo-arrange',event)">
+  <div class="sheet" style="max-height:92vh;display:flex;flex-direction:column;padding-bottom:0;">
+    <div style="padding:0 18px;flex-shrink:0;">
+      <div class="sheet-handle"></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <div class="sheet-title" style="margin-bottom:0;flex:1;">🔀 Ayusin ang Products</div>
+        <button onclick="closeOverlay('mo-arrange')" style="width:30px;height:30px;border-radius:50%;border:1.5px solid var(--line);background:var(--surface);color:var(--ink3);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">✕</button>
+      </div>
+      <!-- Supplier selector -->
+      <div style="margin-bottom:10px;">
+        <select id="arrange-sup-select" onchange="loadArrangeItems()" class="f-inp" style="margin:0;">
+          <option value="">Piliin ang supplier...</option>
+        </select>
+      </div>
+      <div style="font-size:12px;color:var(--ink3);margin-bottom:10px;">☰ I-drag ang bawat item para ayusin ang pagkakasunod</div>
+    </div>
+    <div id="arrange-list" style="flex:1;overflow-y:auto;padding:0 18px;-webkit-overflow-scrolling:touch;"></div>
+    <div style="padding:12px 18px 28px;background:var(--white);border-top:1px solid var(--line);flex-shrink:0;">
+      <button id="arrange-save-btn" onclick="saveArrangeOrder()" style="width:100%;height:50px;border-radius:14px;border:none;background:var(--brand);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">💾 I-save ang Order</button>
+    </div>
   </div>
 </div>
 
