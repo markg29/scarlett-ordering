@@ -3510,20 +3510,22 @@ function renderArrangeList(){
     return;
   }
   wrap.innerHTML = arrangeItems.map((item,i)=>`
-    <div id="arr-${i}" draggable="true"
-      ondragstart="arrDragStart(event,${i})"
-      ondragover="arrDragOver(event,${i})"
-      ondragend="arrDragEnd()"
-      ontouchstart="arrTouchStart(event,${i})"
-      ontouchmove="arrTouchMove(event)"
-      ontouchend="arrTouchEnd(event)"
-      style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--white);border-radius:12px;margin-bottom:6px;border:1.5px solid var(--line);cursor:grab;user-select:none;-webkit-user-select:none;transition:background .1s;">
-      <div style="color:var(--ink3);font-size:18px;flex-shrink:0;">☰</div>
+    <div id="arr-${i}"
+      style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--white);border-radius:12px;margin-bottom:6px;border:1.5px solid var(--line);">
+      <div class="arr-handle"
+        draggable="true"
+        ondragstart="arrDragStart(event,${i})"
+        ondragover="arrDragOver(event,${i})"
+        ondragend="arrDragEnd()"
+        ontouchstart="arrTouchStart(event,${i})"
+        ontouchmove="arrTouchMove(event)"
+        ontouchend="arrTouchEnd(event)"
+        style="color:var(--ink3);font-size:22px;flex-shrink:0;cursor:grab;padding:4px;touch-action:none;-webkit-touch-callout:none;user-select:none;">☰</div>
       <div style="flex:1;min-width:0;">
         <div style="font-size:13px;font-weight:600;line-height:1.3;">${item.name}</div>
         <div style="font-size:11px;color:var(--ink3);margin-top:2px;">${item.unit||''} ${item.category?'· '+item.category:''}</div>
       </div>
-      <div style="font-size:11px;font-weight:700;color:var(--ink3);flex-shrink:0;">#${i+1}</div>
+      <div style="font-size:12px;font-weight:700;color:var(--ink3);background:var(--surface);border-radius:8px;padding:3px 8px;flex-shrink:0;">#${i+1}</div>
     </div>`).join('');
 }
 
@@ -3556,13 +3558,17 @@ let touchStartY = 0;
 function arrTouchStart(e, idx){
   touchSrcIdx = idx;
   touchStartY = e.touches[0].clientY;
+  // Find the parent row
   const el = document.getElementById('arr-'+idx);
-  el.style.opacity = '0.5';
+  if(el) el.style.opacity = '0.5';
   // Create visual clone
-  touchClone = el.cloneNode(true);
-  touchClone.style.cssText += ';position:fixed;left:18px;right:18px;z-index:9999;pointer-events:none;opacity:0.9;box-shadow:0 8px 24px rgba(0,0,0,.2);';
-  touchClone.style.top = el.getBoundingClientRect().top + 'px';
-  document.body.appendChild(touchClone);
+  const rect = el?.getBoundingClientRect();
+  touchClone = el?.cloneNode(true);
+  if(touchClone && rect){
+    touchClone.style.cssText += ';position:fixed;left:18px;right:18px;z-index:9999;pointer-events:none;opacity:0.9;box-shadow:0 8px 24px rgba(0,0,0,.2);margin:0;';
+    touchClone.style.top = rect.top + 'px';
+    document.body.appendChild(touchClone);
+  }
 }
 
 function arrTouchMove(e){
@@ -3572,15 +3578,15 @@ function arrTouchMove(e){
   if(touchClone) touchClone.style.top = (y - 30) + 'px';
   // Find which item we're hovering over
   const wrap = document.getElementById('arrange-list');
-  const items = wrap.querySelectorAll('[id^="arr-"]');
-  items.forEach((el, i)=>{
+  if(!wrap) return;
+  const rows = wrap.querySelectorAll('[id^="arr-"]');
+  rows.forEach((el, i)=>{
     const rect = el.getBoundingClientRect();
     if(y >= rect.top && y <= rect.bottom && i !== touchSrcIdx){
       const moved = arrangeItems.splice(touchSrcIdx, 1)[0];
       arrangeItems.splice(i, 0, moved);
       touchSrcIdx = i;
       renderArrangeList();
-      // Re-apply opacity to dragged item
       const newEl = document.getElementById('arr-'+i);
       if(newEl) newEl.style.opacity='0.5';
     }
@@ -3589,7 +3595,12 @@ function arrTouchMove(e){
 
 function arrTouchEnd(e){
   if(touchClone){ touchClone.remove(); touchClone=null; }
+  const wasIdx = touchSrcIdx;
   touchSrcIdx = null;
+  if(wasIdx!==null){
+    const el = document.getElementById('arr-'+wasIdx);
+    if(el) el.style.opacity='';
+  }
   renderArrangeList();
 }
 
@@ -3640,17 +3651,38 @@ function addBatchRow(){
   const wrap = document.getElementById('batch-rows');
   const row = document.createElement('div');
   row.id = `brow-${id}`;
-  row.style.cssText = 'display:grid;grid-template-columns:2fr 80px 80px 70px 1fr 28px;gap:4px;align-items:center;';
+  row.style.cssText = 'background:var(--white);border:1.5px solid var(--line);border-radius:14px;padding:12px;';
   row.innerHTML = `
-    <input class="f-inp" placeholder="Item name..." id="bn-${id}" style="margin:0;font-size:12px;padding:6px 8px;"/>
-    <input class="f-inp" placeholder="PCS" id="bu-${id}" style="margin:0;font-size:12px;padding:6px 8px;"/>
-    <input class="f-inp" type="number" inputmode="decimal" placeholder="0.00" id="bp-${id}" style="margin:0;font-size:12px;padding:6px 8px;"/>
-    <input class="f-inp" type="number" inputmode="numeric" placeholder="0" id="bm-${id}" style="margin:0;font-size:12px;padding:6px 8px;"/>
-    <input class="f-inp" placeholder="Category" id="bc-${id}" style="margin:0;font-size:12px;padding:6px 8px;"/>
-    <button onclick="removeBatchRow(${id})" style="width:26px;height:26px;border-radius:7px;border:none;background:var(--dangerbg);color:var(--danger);font-size:13px;cursor:pointer;flex-shrink:0;">✕</button>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div style="font-size:11px;font-weight:800;color:var(--ink3);text-transform:uppercase;">Item #${id}</div>
+      <button onclick="removeBatchRow(${id})" style="height:26px;padding:0 10px;border-radius:8px;border:none;background:var(--dangerbg);color:var(--danger);font-size:12px;font-weight:700;cursor:pointer;">✕ Alisin</button>
+    </div>
+    <div style="margin-bottom:8px;">
+      <div style="font-size:11px;font-weight:700;color:var(--ink3);margin-bottom:4px;">Item Name *</div>
+      <input class="f-inp" placeholder="Halimbawa: LUCKY ME PANCIT CANTON 60G" id="bn-${id}" style="margin:0;font-size:14px;"/>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--ink3);margin-bottom:4px;">Unit</div>
+        <input class="f-inp" placeholder="PCS / CASE / BOX" id="bu-${id}" style="margin:0;font-size:14px;"/>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--ink3);margin-bottom:4px;">Price (₱)</div>
+        <input class="f-inp" type="number" inputmode="decimal" placeholder="0.00" id="bp-${id}" style="margin:0;font-size:14px;"/>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--ink3);margin-bottom:4px;">Max Order</div>
+        <input class="f-inp" type="number" inputmode="numeric" placeholder="0" id="bm-${id}" style="margin:0;font-size:14px;"/>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--ink3);margin-bottom:4px;">Category</div>
+        <input class="f-inp" placeholder="Beverages..." id="bc-${id}" style="margin:0;font-size:14px;"/>
+      </div>
+    </div>
   `;
   wrap.appendChild(row);
-  // Focus first empty name field
   setTimeout(()=>row.querySelector('input')?.focus(), 50);
 }
 
@@ -4218,22 +4250,12 @@ function showUpdateToast(){
       <div id="batch-sup-label" style="font-size:13px;font-weight:700;color:var(--brand);margin-bottom:12px;"></div>
     </div>
 
-    <!-- Table header -->
-    <div style="display:grid;grid-template-columns:2fr 80px 80px 70px 1fr 28px;gap:4px;padding:6px 18px;background:var(--surface);border-top:1px solid var(--line);border-bottom:1px solid var(--line);flex-shrink:0;">
-      <div style="font-size:10px;font-weight:800;color:var(--ink3);text-transform:uppercase;">Item Name</div>
-      <div style="font-size:10px;font-weight:800;color:var(--ink3);text-transform:uppercase;">Unit</div>
-      <div style="font-size:10px;font-weight:800;color:var(--ink3);text-transform:uppercase;">Price</div>
-      <div style="font-size:10px;font-weight:800;color:var(--ink3);text-transform:uppercase;">Max</div>
-      <div style="font-size:10px;font-weight:800;color:var(--ink3);text-transform:uppercase;">Category</div>
-      <div></div>
-    </div>
-
-    <!-- Scrollable rows -->
-    <div id="batch-rows" style="flex:1;overflow-y:auto;padding:8px 18px;display:flex;flex-direction:column;gap:6px;-webkit-overflow-scrolling:touch;"></div>
+    <!-- Scrollable rows — card style, one per item -->
+    <div id="batch-rows" style="flex:1;overflow-y:auto;padding:0 18px 8px;display:flex;flex-direction:column;gap:10px;-webkit-overflow-scrolling:touch;"></div>
 
     <!-- Footer -->
     <div style="padding:10px 18px 28px;background:var(--white);border-top:1px solid var(--line);flex-shrink:0;">
-      <button onclick="addBatchRow()" style="width:100%;height:38px;border-radius:12px;border:1.5px dashed var(--brand);background:var(--brandbg);color:var(--brand);font-size:13px;font-weight:700;cursor:pointer;margin-bottom:10px;">+ Dagdag na Row</button>
+      <button onclick="addBatchRow()" style="width:100%;height:42px;border-radius:12px;border:1.5px dashed var(--brand);background:var(--brandbg);color:var(--brand);font-size:14px;font-weight:700;cursor:pointer;margin-bottom:10px;">+ Dagdag na Item</button>
       <button id="batch-save-btn" onclick="saveBatchItems()" style="width:100%;height:50px;border-radius:14px;border:none;background:var(--brand);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">💾 I-save ang Lahat</button>
     </div>
   </div>
