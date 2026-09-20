@@ -646,7 +646,14 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--surface);color:
     </div>
   </div>
   <div class="set-card">
-    <div class="set-row" onclick="openArrangeProducts()">
+    <div class="set-row" onclick="toggleListModeSetting()">
+      <div class="set-ic">📋</div>
+      <div class="set-body"><div class="set-name">List Mode sa Pag-order</div><div class="set-desc">I-enable para makita ang Lista button sa Quick Mode</div></div>
+      <div id="list-mode-toggle" style="width:44px;height:26px;border-radius:999px;background:var(--line);position:relative;cursor:pointer;transition:background .2s;flex-shrink:0;">
+        <div id="list-mode-knob" style="position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 4px rgba(0,0,0,.2);"></div>
+      </div>
+    </div>
+  </div>
       <div class="set-ic">🔀</div>
       <div class="set-body"><div class="set-name">Ayusin ang Products</div><div class="set-desc">I-drag ang mga items para baguhin ang pagkakasunod</div></div>
       <div class="set-ch">›</div>
@@ -1093,7 +1100,9 @@ function qmRender(){
       🏪 May kulang? Kumuha sa ibang supplier
     </button>
     `;
-  // Susunod button always stays as Susunod — review bar handles review navigation
+  // Show Lista button only if list mode is enabled in settings
+  const listaBtn = document.getElementById('qm-lista-btn');
+  if(listaBtn) listaBtn.style.display = isListModeEnabled() ? '' : 'none';
   // Update review bar
   const _rb=document.getElementById('qm-review-bar');
   const _rc=document.getElementById('qm-cart-count');
@@ -3819,6 +3828,24 @@ const PCFG={
 const TMAP={home:'tb-home',products:'tb-products',items:'tb-products',history:'tb-history',settings:'tb-settings'};
 let curPage='home';
 
+// ── List Mode Setting ────────────────────────────────────────
+function initListModeSetting(){
+  const on = localStorage.getItem('qm_list_mode')==='1';
+  const toggle = document.getElementById('list-mode-toggle');
+  const knob = document.getElementById('list-mode-knob');
+  if(toggle) toggle.style.background = on ? 'var(--brand)' : 'var(--line)';
+  if(knob) knob.style.left = on ? '21px' : '3px';
+}
+function toggleListModeSetting(){
+  const on = localStorage.getItem('qm_list_mode')==='1';
+  localStorage.setItem('qm_list_mode', on ? '0' : '1');
+  initListModeSetting();
+  toast(on ? 'List Mode na-off' : 'List Mode na-on ✓', 'ok');
+}
+function isListModeEnabled(){
+  return localStorage.getItem('qm_list_mode')==='1';
+}
+
 function goTab(name){
   if(name==='items'&&!activeSup){
     toast('👆 Pumili muna ng supplier','err');
@@ -3834,6 +3861,7 @@ function goTab(name){
     return;
   }
   if(name==='history')renderHistoryTab();
+  if(name==='settings')initListModeSetting();
   if(name==='products'){
     initProductsPage();
     renderProducts();
@@ -4071,7 +4099,7 @@ function showUpdateToast(){
       <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="qm-sup-name"></div>
     </div>
     <button id="qm-back-btn" onclick="qmBack()" style="display:none;padding:0 8px;height:30px;border-radius:999px;border:1.5px solid var(--line);background:var(--white);color:var(--ink2);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;">‹ Prev</button>
-    <button onclick="switchToListView()" style="padding:0 8px;height:30px;border-radius:999px;border:1.5px solid var(--line);background:var(--white);color:var(--ink2);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;">📋 Lista</button>
+    <button id="qm-lista-btn" onclick="switchToListView()" style="display:none;padding:0 8px;height:30px;border-radius:999px;border:1.5px solid var(--line);background:var(--white);color:var(--ink2);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;">📋 Lista</button>
     <button onclick="openOverlay('mo-qm-legend')" style="width:28px;height:28px;border-radius:50%;border:1.5px solid var(--line);background:var(--white);color:var(--ink3);font-size:13px;font-weight:800;cursor:pointer;flex-shrink:0;">?</button>
   </div>
   <!-- Progress -->
@@ -4088,6 +4116,7 @@ function showUpdateToast(){
   <!-- Controls -->
   <div style="background:var(--white);border-top:1px solid var(--line);flex-shrink:0;">
     <div style="padding:10px 16px 0;">
+      <!-- Stepper row -->
       <div style="display:flex;gap:10px;margin-bottom:8px;">
         <button id="qm-minus" onclick="qmAdj(-1)" style="width:60px;height:60px;border-radius:16px;border:2px solid var(--line);background:var(--surface);font-size:28px;font-weight:300;color:var(--brand);cursor:pointer;">−</button>
         <input id="qm-qty" type="number" inputmode="numeric" min="0" placeholder="0"
@@ -4095,16 +4124,19 @@ function showUpdateToast(){
           oninput="qmQtyInput(this.value)"/>
         <button id="qm-plus" onclick="qmAdj(1)" style="width:60px;height:60px;border-radius:16px;border:2px solid var(--line);background:var(--surface);font-size:28px;font-weight:300;color:var(--brand);cursor:pointer;">+</button>
       </div>
-      <div style="display:flex;gap:10px;margin-bottom:8px;">
+      <!-- Susunod — full width -->
+      <div style="margin-bottom:8px;">
+        <button id="qm-next-btn" onclick="qmNext()" style="width:100%;height:52px;border-radius:14px;border:none;background:var(--brand);color:#fff;font-size:16px;font-weight:700;cursor:pointer;">Susunod →</button>
+      </div>
+      <!-- Skip — full width, hold to skip -->
+      <div style="margin-bottom:8px;">
         <button id="qm-skip-btn"
-        onmousedown="skipHoldStart()" onmouseup="skipHoldCancel()" onmouseleave="skipHoldCancel()"
-        ontouchstart="skipHoldStart(event)" ontouchend="skipHoldCancel()" ontouchcancel="skipHoldCancel()"
-        style="flex:1;height:48px;border-radius:14px;border:2px solid var(--danger);background:var(--white);color:var(--danger);font-size:13px;font-weight:700;cursor:pointer;position:relative;overflow:hidden;user-select:none;-webkit-user-select:none;">
-        <span id="qm-skip-label">✕ Skip</span>
-        <!-- Progress bar at TOP so thumb doesn't cover it -->
-        <div id="qm-skip-fill" style="position:absolute;left:0;top:0;height:4px;width:0%;background:var(--danger);transition:width 0.9s linear;pointer-events:none;border-radius:4px 4px 0 0;"></div>
-      </button>
-        <button id="qm-next-btn" onclick="qmNext()" style="flex:2;height:48px;border-radius:14px;border:none;background:var(--brand);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">Susunod →</button>
+          onmousedown="skipHoldStart()" onmouseup="skipHoldCancel()" onmouseleave="skipHoldCancel()"
+          ontouchstart="skipHoldStart(event)" ontouchend="skipHoldCancel()" ontouchcancel="skipHoldCancel()"
+          style="width:100%;height:44px;border-radius:14px;border:2px solid var(--danger);background:var(--white);color:var(--danger);font-size:13px;font-weight:700;cursor:pointer;position:relative;overflow:hidden;user-select:none;-webkit-user-select:none;">
+          <span id="qm-skip-label">✕ Wala — I-skip (hold)</span>
+          <div id="qm-skip-fill" style="position:absolute;left:0;top:0;height:4px;width:0%;background:var(--danger);transition:width 0.9s linear;pointer-events:none;border-radius:4px 4px 0 0;"></div>
+        </button>
       </div>
     </div>
     <div id="qm-review-bar" style="display:none;padding:0 16px 8px;">
