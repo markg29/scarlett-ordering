@@ -638,11 +638,10 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--surface);color:
       <div class="set-body"><div class="set-name">Magdagdag ng Supplier</div><div class="set-desc">Mag-add ng bagong supplier</div></div>
       <div class="set-ch">›</div>
     </div>
-  </div>
-  <div class="set-card">
-    <div class="set-row">
-      <div class="set-ic">ℹ️</div>
-      <div class="set-body"><div class="set-name">OrderKo v4.0</div><div class="set-desc">Grocery Supplier Ordering System</div></div>
+    <div class="set-row" onclick="openArrangeProducts()">
+      <div class="set-ic">🔀</div>
+      <div class="set-body"><div class="set-name">Ayusin ang Products</div><div class="set-desc">I-drag ang mga items para baguhin ang pagkakasunod</div></div>
+      <div class="set-ch">›</div>
     </div>
   </div>
   <div class="set-card">
@@ -654,9 +653,10 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--surface);color:
       </div>
     </div>
   </div>
-      <div class="set-ic">🔀</div>
-      <div class="set-body"><div class="set-name">Ayusin ang Products</div><div class="set-desc">I-drag ang mga items para baguhin ang pagkakasunod</div></div>
-      <div class="set-ch">›</div>
+  <div class="set-card">
+    <div class="set-row">
+      <div class="set-ic">ℹ️</div>
+      <div class="set-body"><div class="set-name">OrderKo v4.0</div><div class="set-desc">Grocery Supplier Ordering System</div></div>
     </div>
   </div>
 </div>
@@ -1238,23 +1238,29 @@ function skipHoldCancel(){
 
 function qmSkip(){
   const item=qmItems[qmIndex];
-  // Remove from cart if was there
   const existing=cart.findIndex(c=>c.itemId===item.id);
   if(existing>=0)cart.splice(existing,1);
   skippedItems.add(item.id);
   saveCartState();
   refreshFloat();
-  // Flash the card red so user sees the skip clearly
+  // Flash card red + show skip popup
   const card=document.getElementById('qm-card-wrap');
+  // Show skip banner
+  const banner=document.createElement('div');
+  banner.style.cssText='position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--danger);color:#fff;font-size:18px;font-weight:800;border-radius:14px;padding:12px 28px;z-index:10;pointer-events:none;white-space:nowrap;';
+  banner.textContent='✕ Na-skip!';
   if(card){
+    card.style.position='relative';
+    card.appendChild(banner);
     card.style.transition='background .1s';
     card.style.background='#fee2e2';
     setTimeout(()=>{
+      banner.remove();
       card.style.background='';
       qmIndex++;
       qmCurrentQty=0;
       qmRender();
-    },250);
+    },500);
   }else{
     qmIndex++;
     qmCurrentQty=0;
@@ -4040,19 +4046,25 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.register('./sw-ordering.js')
     .then(reg => {
       if(reg.active) reg.active.postMessage('warmup');
-      // Check for updates immediately on load
       reg.update();
-      // Also check on page focus (when user switches back to tab/app)
+      // When a new SW is found waiting, force it to activate immediately
+      reg.addEventListener('updatefound', ()=>{
+        const newSW = reg.installing;
+        newSW?.addEventListener('statechange', ()=>{
+          if(newSW.state==='installed' && navigator.serviceWorker.controller){
+            // New SW is ready — tell it to skip waiting
+            newSW.postMessage('skipWaiting');
+          }
+        });
+      });
       document.addEventListener('visibilitychange', ()=>{
         if(document.visibilityState==='visible') reg.update();
       });
     })
     .catch(()=>{});
-  // Listen for messages from new SW
   navigator.serviceWorker.addEventListener('message', e=>{
     if(e.data?.type==='sw-updated') showUpdateToast();
   });
-  // Check every 2 minutes (was 5)
   navigator.serviceWorker.ready.then(reg=>{
     setInterval(()=>reg.update(), 2*60*1000);
   });
