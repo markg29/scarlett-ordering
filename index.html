@@ -1197,6 +1197,33 @@ function qmBack(){
 }
 
 
+// ── Hold-to-Skip ──────────────────────────────────────────────
+let _skipHoldTimer = null;
+
+function skipHoldStart(e){
+  if(e) e.preventDefault();
+  if(_skipHoldTimer) return;
+  // Start fill animation
+  const fill = document.getElementById('qm-skip-fill');
+  const label = document.getElementById('qm-skip-label');
+  if(fill){ fill.style.transition='width 0.9s linear'; fill.style.width='100%'; }
+  if(label) label.textContent = 'Hold...';
+  _skipHoldTimer = setTimeout(()=>{
+    _skipHoldTimer = null;
+    skipHoldCancel();
+    qmSkip();
+  }, 900);
+}
+
+function skipHoldCancel(){
+  if(_skipHoldTimer){ clearTimeout(_skipHoldTimer); _skipHoldTimer=null; }
+  const fill = document.getElementById('qm-skip-fill');
+  const label = document.getElementById('qm-skip-label');
+  if(fill){ fill.style.transition='width 0.15s linear'; fill.style.width='0%'; }
+  if(label) label.textContent='✕ Skip';
+}
+
+
 function qmSkip(){
   const item=qmItems[qmIndex];
   // Remove from cart if was there
@@ -4053,7 +4080,13 @@ function showUpdateToast(){
         <button id="qm-plus" onclick="qmAdj(1)" style="width:60px;height:60px;border-radius:16px;border:2px solid var(--line);background:var(--surface);font-size:28px;font-weight:300;color:var(--brand);cursor:pointer;">+</button>
       </div>
       <div style="display:flex;gap:10px;margin-bottom:8px;">
-        <button onclick="qmSkip()" style="flex:1;height:48px;border-radius:14px;border:2px solid var(--danger);background:var(--white);color:var(--danger);font-size:14px;font-weight:700;cursor:pointer;">✕ Skip</button>
+        <button id="qm-skip-btn"
+        onmousedown="skipHoldStart()" onmouseup="skipHoldCancel()" onmouseleave="skipHoldCancel()"
+        ontouchstart="skipHoldStart(event)" ontouchend="skipHoldCancel()" ontouchcancel="skipHoldCancel()"
+        style="flex:1;height:48px;border-radius:14px;border:2px solid var(--danger);background:var(--white);color:var(--danger);font-size:13px;font-weight:700;cursor:pointer;position:relative;overflow:hidden;user-select:none;-webkit-user-select:none;">
+        <span id="qm-skip-label">✕ Skip</span>
+        <div id="qm-skip-fill" style="position:absolute;left:0;top:0;height:100%;width:0%;background:var(--danger);opacity:.15;transition:width 1s linear;pointer-events:none;"></div>
+      </button>
         <button id="qm-next-btn" onclick="qmNext()" style="flex:2;height:48px;border-radius:14px;border:none;background:var(--brand);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">Susunod →</button>
       </div>
     </div>
