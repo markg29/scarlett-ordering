@@ -1203,11 +1203,12 @@ let _skipHoldTimer = null;
 function skipHoldStart(e){
   if(e) e.preventDefault();
   if(_skipHoldTimer) return;
-  // Start fill animation
   const fill = document.getElementById('qm-skip-fill');
   const label = document.getElementById('qm-skip-label');
+  const btn = document.getElementById('qm-skip-btn');
   if(fill){ fill.style.transition='width 0.9s linear'; fill.style.width='100%'; }
-  if(label) label.textContent = 'Hold...';
+  if(label) label.textContent = 'I-skip...';
+  if(btn) btn.style.background='var(--dangerbg)';
   _skipHoldTimer = setTimeout(()=>{
     _skipHoldTimer = null;
     skipHoldCancel();
@@ -1219,8 +1220,10 @@ function skipHoldCancel(){
   if(_skipHoldTimer){ clearTimeout(_skipHoldTimer); _skipHoldTimer=null; }
   const fill = document.getElementById('qm-skip-fill');
   const label = document.getElementById('qm-skip-label');
+  const btn = document.getElementById('qm-skip-btn');
   if(fill){ fill.style.transition='width 0.15s linear'; fill.style.width='0%'; }
   if(label) label.textContent='✕ Skip';
+  if(btn) btn.style.background='var(--white)';
 }
 
 
@@ -1232,9 +1235,22 @@ function qmSkip(){
   skippedItems.add(item.id);
   saveCartState();
   refreshFloat();
-  qmIndex++;
-  qmCurrentQty=0;
-  qmRender();
+  // Flash the card red so user sees the skip clearly
+  const card=document.getElementById('qm-card-wrap');
+  if(card){
+    card.style.transition='background .1s';
+    card.style.background='#fee2e2';
+    setTimeout(()=>{
+      card.style.background='';
+      qmIndex++;
+      qmCurrentQty=0;
+      qmRender();
+    },250);
+  }else{
+    qmIndex++;
+    qmCurrentQty=0;
+    qmRender();
+  }
 }
 
 // ════════════════════════════════════════
@@ -4085,7 +4101,8 @@ function showUpdateToast(){
         ontouchstart="skipHoldStart(event)" ontouchend="skipHoldCancel()" ontouchcancel="skipHoldCancel()"
         style="flex:1;height:48px;border-radius:14px;border:2px solid var(--danger);background:var(--white);color:var(--danger);font-size:13px;font-weight:700;cursor:pointer;position:relative;overflow:hidden;user-select:none;-webkit-user-select:none;">
         <span id="qm-skip-label">✕ Skip</span>
-        <div id="qm-skip-fill" style="position:absolute;left:0;top:0;height:100%;width:0%;background:var(--danger);opacity:.15;transition:width 1s linear;pointer-events:none;"></div>
+        <!-- Progress bar at TOP so thumb doesn't cover it -->
+        <div id="qm-skip-fill" style="position:absolute;left:0;top:0;height:4px;width:0%;background:var(--danger);transition:width 0.9s linear;pointer-events:none;border-radius:4px 4px 0 0;"></div>
       </button>
         <button id="qm-next-btn" onclick="qmNext()" style="flex:2;height:48px;border-radius:14px;border:none;background:var(--brand);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">Susunod →</button>
       </div>
