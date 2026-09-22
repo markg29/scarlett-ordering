@@ -886,22 +886,17 @@ let inventoryGoods=[]; // from Scarlett Inventory System (Goods sheet), matched 
 // API
 // ════════════════════════════════════════
 async function apiGet(p,_retry=0){
+  const controller = new AbortController();
+  const timeoutId = setTimeout(()=>controller.abort(), 25000); // 25s timeout
   try{
     const r=await fetch(`${API}?${new URLSearchParams(p)}`,{
-      redirect:'follow',cache:'no-store'
+      redirect:'follow',cache:'no-store',signal:controller.signal
     });
+    clearTimeout(timeoutId);
     if(!r.ok){
-      // 404 from Apps Script is a redirect artifact — retry quickly, max 3 times
-      if(r.status===404&&_retry<3){
+      if(_retry<1){
         await new Promise(res=>setTimeout(res,800));
         return apiGet(p,_retry+1);
-      }
-      if(r.status!==404){
-        // Other HTTP errors — retry with backoff, max 3 times
-        if(_retry<3){
-          await new Promise(res=>setTimeout(res,1000*(_retry+1)));
-          return apiGet(p,_retry+1);
-        }
       }
       throw new Error(`HTTP ${r.status}`);
     }
@@ -909,15 +904,11 @@ async function apiGet(p,_retry=0){
     if(!d.ok)throw new Error(d.error||'Error');
     return d;
   }catch(e){
-    // Network error / offline — retry with backoff, max 5 times then throw
-    if(e.name==='TypeError'||String(e).includes('fetch')||e.name==='AbortError'){
-      if(_retry<5){
-        setConnStatus('error');
-        const delay=Math.min(2000*(_retry+1),10000);
-        await new Promise(res=>setTimeout(res,delay));
-        setConnStatus('checking');
-        return apiGet(p,_retry+1);
-      }
+    clearTimeout(timeoutId);
+    if(e.name==='AbortError') throw new Error('Timeout');
+    if((e.name==='TypeError'||String(e).includes('fetch'))&&_retry<1){
+      await new Promise(res=>setTimeout(res,1000));
+      return apiGet(p,_retry+1);
     }
     throw e;
   }
@@ -1416,24 +1407,19 @@ async function loadAll(){
     setConnStatus('checking');
   }
 
-  // Fetch fresh in background
+  // Fetch fresh in background — getAll first (critical), inventory after (secondary)
   try{
-    const [d, dInv] = await Promise.all([
-      apiGet({action:'getAll'}),
-      apiGet({action:'getInventory'}).catch(err=>{
-        console.warn('Inventory fetch failed, keeping existing data:', err.message);
-        return null; // null = failed, don't overwrite
-      })
-    ]);
+    const d = await apiGet({action:'getAll'});
     suppliers=(d.suppliers||[]).map(r=>({id:String(r[0]||''),name:String(r[1]||''),logo:String(r[2]||'')})).filter(s=>s.id&&s.name);
     allItems=(d.items||[]).map((r,idx)=>({id:String(r[0]||''),supplierId:String(r[1]||''),name:String(r[2]||''),unit:String(r[3]||''),price:parseFloat(r[4])||0,maxOrder:r[5]!==''&&r[5]!==null&&r[5]!==undefined?parseInt(r[5])||0:0,imageUrl:String(r[6]||''),category:String(r[7]||''),sortOrder:r[8]!==''&&r[8]!==null&&r[8]!==undefined?parseInt(r[8])||idx:idx})).filter(i=>i.id&&i.name);
     allOrders=(d.orders||[]).map(r=>({orderId:String(r[0]||''),date:fmtDate(r[1]),supplierId:String(r[2]||''),supplierName:String(r[3]||''),itemId:String(r[4]||''),itemName:String(r[5]||''),qty:parseFloat(r[6])||0,unit:String(r[7]||''),price:parseFloat(r[8])||0,notes:String(r[9]||'')})).filter(o=>o.orderId);
-    if(dInv) inventoryGoods=(dInv.goods||[]).map(r=>({id:String(r[0]||''),name:String(r[1]||''),quantity:parseFloat(r[4])||0,minStockQty:parseFloat(r[5])||0,unit:String(r[7]||'')})).filter(g=>g.id&&g.name);
     setConnStatus('ok');
-    saveDataCache(d, dInv);
+    saveDataCache(d, null); // save main data immediately
     renderHome();
     restoreCartState();
     if(activeSup) renderItems();
+    // Fetch inventory separately after main data is ready
+    silentRefreshInventory();
   }catch(e){
     setConnStatus('error');
     if(!cached){
