@@ -1359,12 +1359,13 @@ const CACHE_KEY = 'orderko_data_cache';
 
 function saveDataCache(d, dInv){
   try{
+    const existing=JSON.parse(localStorage.getItem(CACHE_KEY)||'{}');
     localStorage.setItem(CACHE_KEY, JSON.stringify({
       suppliers: d.suppliers||[],
       items: d.items||[],
-      orders: d.orders||[],
-      inventory: dInv ? (dInv.goods||[]) : null, // null if fetch failed
-      invTs: dInv ? Date.now() : (JSON.parse(localStorage.getItem(CACHE_KEY)||'{}').invTs||0),
+      orders: d.orders||existing.orders||[],
+      inventory: dInv?(dInv.goods||[]):(existing.inventory||null),
+      invTs: dInv?Date.now():(existing.invTs||0),
       ts: Date.now()
     }));
   }catch(e){}
@@ -1406,19 +1407,32 @@ async function loadAll(){
     setConnStatus('checking');
   }
 
-  // Fetch fresh in background — getAll first (critical), inventory after (secondary)
+  // Fetch fresh — suppliers+items only (fast), orders+inventory in background
   try{
     const d = await apiGet({action:'getAll'});
     suppliers=(d.suppliers||[]).map(r=>({id:String(r[0]||''),name:String(r[1]||''),logo:String(r[2]||'')})).filter(s=>s.id&&s.name);
     allItems=(d.items||[]).map((r,idx)=>({id:String(r[0]||''),supplierId:String(r[1]||''),name:String(r[2]||''),unit:String(r[3]||''),price:parseFloat(r[4])||0,maxOrder:r[5]!==''&&r[5]!==null&&r[5]!==undefined?parseInt(r[5])||0:0,imageUrl:String(r[6]||''),category:String(r[7]||''),sortOrder:r[8]!==''&&r[8]!==null&&r[8]!==undefined?parseInt(r[8])||idx:idx})).filter(i=>i.id&&i.name);
-    allOrders=(d.orders||[]).map(r=>({orderId:String(r[0]||''),date:fmtDate(r[1]),supplierId:String(r[2]||''),supplierName:String(r[3]||''),itemId:String(r[4]||''),itemName:String(r[5]||''),qty:parseFloat(r[6])||0,unit:String(r[7]||''),price:parseFloat(r[8])||0,notes:String(r[9]||'')})).filter(o=>o.orderId);
     setConnStatus('ok');
-    saveDataCache(d, null); // save main data immediately
+    // Save suppliers+items to cache immediately
+    saveDataCache(d, null);
     renderHome();
     restoreCartState();
     if(activeSup) renderItems();
-    // Fetch inventory separately after main data is ready
-    silentRefreshInventory();
+    // Fetch orders + inventory in background (non-blocking)
+    Promise.all([
+      apiGet({action:'getOrders'}).then(dOrders=>{
+        allOrders=(dOrders.orders||[]).map(r=>({orderId:String(r[0]||''),date:fmtDate(r[1]),supplierId:String(r[2]||''),supplierName:String(r[3]||''),itemId:String(r[4]||''),itemName:String(r[5]||''),qty:parseFloat(r[6])||0,unit:String(r[7]||''),price:parseFloat(r[8])||0,notes:String(r[9]||'')})).filter(o=>o.orderId);
+        // Update cache with orders
+        try{
+          const c=JSON.parse(localStorage.getItem(CACHE_KEY)||'{}');
+          c.orders=dOrders.orders||[];
+          localStorage.setItem(CACHE_KEY,JSON.stringify(c));
+        }catch(e){}
+        // Re-render home to update recent orders
+        renderHome();
+      }).catch(()=>{}),
+      silentRefreshInventory()
+    ]);
   }catch(e){
     setConnStatus('error');
     if(!cached){
