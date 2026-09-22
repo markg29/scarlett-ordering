@@ -560,6 +560,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--surface);color:
   <div style="padding:4px 0 0;">
     <div class="sup-pill" id="sup-pill">🏭 Supplier</div>
   </div>
+  <div id="inv-stale-warn" style="display:none;margin:0 16px 8px;padding:8px 12px;background:#fff7ed;color:#c2410c;border-radius:10px;font-size:12px;font-weight:600;border:1px solid #fed7aa;"></div>
   <div id="items-wrap">
     <div class="cload"><div class="spin"></div>Naglo-load ng items...</div>
   </div>
@@ -1345,7 +1346,8 @@ function saveDataCache(d, dInv){
       suppliers: d.suppliers||[],
       items: d.items||[],
       orders: d.orders||[],
-      inventory: dInv.goods||[],
+      inventory: dInv ? (dInv.goods||[]) : null, // null if fetch failed
+      invTs: dInv ? Date.now() : (JSON.parse(localStorage.getItem(CACHE_KEY)||'{}').invTs||0),
       ts: Date.now()
     }));
   }catch(e){}
@@ -1366,7 +1368,7 @@ async function loadAll(){
     suppliers=(cached.suppliers||[]).map(r=>({id:String(r[0]||''),name:String(r[1]||''),logo:String(r[2]||'')})).filter(s=>s.id&&s.name);
     allItems=(cached.items||[]).map(r=>({id:String(r[0]||''),supplierId:String(r[1]||''),name:String(r[2]||''),unit:String(r[3]||''),price:parseFloat(r[4])||0,maxOrder:r[5]!==''&&r[5]!==null&&r[5]!==undefined?parseInt(r[5])||0:0,imageUrl:String(r[6]||''),category:String(r[7]||'')})).filter(i=>i.id&&i.name);
     allOrders=(cached.orders||[]).map(r=>({orderId:String(r[0]||''),date:fmtDate(r[1]),supplierId:String(r[2]||''),supplierName:String(r[3]||''),itemId:String(r[4]||''),itemName:String(r[5]||''),qty:parseFloat(r[6])||0,unit:String(r[7]||''),price:parseFloat(r[8])||0,notes:String(r[9]||'')})).filter(o=>o.orderId);
-    inventoryGoods=(cached.inventory||[]).map(r=>({id:String(r[0]||''),name:String(r[1]||''),quantity:parseFloat(r[4])||0,minStockQty:parseFloat(r[5])||0,unit:String(r[7]||'')})).filter(g=>g.id&&g.name);
+    if(cached.inventory) inventoryGoods=(cached.inventory||[]).map(r=>({id:String(r[0]||''),name:String(r[1]||''),quantity:parseFloat(r[4])||0,minStockQty:parseFloat(r[5])||0,unit:String(r[7]||'')})).filter(g=>g.id&&g.name);
     renderHome();
     restoreCartState();
     if(activeSup) renderItems();
@@ -1379,12 +1381,15 @@ async function loadAll(){
   try{
     const [d, dInv] = await Promise.all([
       apiGet({action:'getAll'}),
-      apiGet({action:'getInventory'}).catch(()=>({goods:[]}))
+      apiGet({action:'getInventory'}).catch(err=>{
+        console.warn('Inventory fetch failed, keeping existing data:', err.message);
+        return null; // null = failed, don't overwrite
+      })
     ]);
     suppliers=(d.suppliers||[]).map(r=>({id:String(r[0]||''),name:String(r[1]||''),logo:String(r[2]||'')})).filter(s=>s.id&&s.name);
     allItems=(d.items||[]).map((r,idx)=>({id:String(r[0]||''),supplierId:String(r[1]||''),name:String(r[2]||''),unit:String(r[3]||''),price:parseFloat(r[4])||0,maxOrder:r[5]!==''&&r[5]!==null&&r[5]!==undefined?parseInt(r[5])||0:0,imageUrl:String(r[6]||''),category:String(r[7]||''),sortOrder:r[8]!==''&&r[8]!==null&&r[8]!==undefined?parseInt(r[8])||idx:idx})).filter(i=>i.id&&i.name);
     allOrders=(d.orders||[]).map(r=>({orderId:String(r[0]||''),date:fmtDate(r[1]),supplierId:String(r[2]||''),supplierName:String(r[3]||''),itemId:String(r[4]||''),itemName:String(r[5]||''),qty:parseFloat(r[6])||0,unit:String(r[7]||''),price:parseFloat(r[8])||0,notes:String(r[9]||'')})).filter(o=>o.orderId);
-    inventoryGoods=(dInv.goods||[]).map(r=>({id:String(r[0]||''),name:String(r[1]||''),quantity:parseFloat(r[4])||0,minStockQty:parseFloat(r[5])||0,unit:String(r[7]||'')})).filter(g=>g.id&&g.name);
+    if(dInv) inventoryGoods=(dInv.goods||[]).map(r=>({id:String(r[0]||''),name:String(r[1]||''),quantity:parseFloat(r[4])||0,minStockQty:parseFloat(r[5])||0,unit:String(r[7]||'')})).filter(g=>g.id&&g.name);
     setConnStatus('ok');
     saveDataCache(d, dInv);
     renderHome();
@@ -1559,6 +1564,26 @@ function renderItemsSilent(){
 
 function renderItems(){
   updateCheckProgress();
+
+  // Warn if stock data is stale (>30 minutes old) or missing
+  const invWarnEl = document.getElementById('inv-stale-warn');
+  if(invWarnEl){
+    try{
+      const cached = JSON.parse(localStorage.getItem(CACHE_KEY)||'{}');
+      const invTs = cached.invTs || 0;
+      const ageMin = invTs ? Math.floor((Date.now()-invTs)/60000) : null;
+      if(!inventoryGoods.length){
+        invWarnEl.textContent = '⚠️ Hindi na-load ang stock data — baka hindi updated ang stocks';
+        invWarnEl.style.display = 'block';
+      } else if(ageMin !== null && ageMin > 30){
+        invWarnEl.textContent = `⚠️ Stock data: ${ageMin} minuto na — i-refresh para ma-update`;
+        invWarnEl.style.display = 'block';
+      } else {
+        invWarnEl.style.display = 'none';
+      }
+    }catch(e){ if(invWarnEl) invWarnEl.style.display='none'; }
+  }
+
   if(!activeSup){
     document.getElementById('items-wrap').innerHTML=`<div class="empty"><div class="empty-ic">👆</div><div class="empty-h">Walang supplier</div><div class="empty-b">Pumili muna ng supplier sa Home.</div></div>`;
     document.getElementById('sup-pill').textContent='🏭 Walang supplier';
@@ -4024,7 +4049,7 @@ async function silentRefresh(){
     suppliers=(d.suppliers||[]).map(r=>({id:String(r[0]||''),name:String(r[1]||''),logo:String(r[2]||'')})).filter(s=>s.id&&s.name);
     allItems=(d.items||[]).map((r,idx)=>({id:String(r[0]||''),supplierId:String(r[1]||''),name:String(r[2]||''),unit:String(r[3]||''),price:parseFloat(r[4])||0,maxOrder:r[5]!==''&&r[5]!==null&&r[5]!==undefined?parseInt(r[5])||0:0,imageUrl:String(r[6]||''),category:String(r[7]||''),sortOrder:r[8]!==''&&r[8]!==null&&r[8]!==undefined?parseInt(r[8])||idx:idx})).filter(i=>i.id&&i.name);
     allOrders=(d.orders||[]).map(r=>({orderId:String(r[0]||''),date:fmtDate(r[1]),supplierId:String(r[2]||''),supplierName:String(r[3]||''),itemId:String(r[4]||''),itemName:String(r[5]||''),qty:parseFloat(r[6])||0,unit:String(r[7]||''),price:parseFloat(r[8])||0,notes:String(r[9]||'')})).filter(o=>o.orderId);
-    inventoryGoods=(dInv.goods||[]).map(r=>({id:String(r[0]||''),name:String(r[1]||''),quantity:parseFloat(r[4])||0,minStockQty:parseFloat(r[5])||0,unit:String(r[7]||'')})).filter(g=>g.id&&g.name);
+    if(dInv) inventoryGoods=(dInv.goods||[]).map(r=>({id:String(r[0]||''),name:String(r[1]||''),quantity:parseFloat(r[4])||0,minStockQty:parseFloat(r[5])||0,unit:String(r[7]||'')})).filter(g=>g.id&&g.name);
     if(curPage==='home')renderHome();
     else if(curPage==='history')renderHistorySilent(); // preserve open cards
     else if(curPage==='items')renderItemsSilent();
