@@ -629,7 +629,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--surface);color:
 <!-- PAGE: SETTINGS -->
 <div class="page" id="pg-settings">
   <div class="set-card" style="margin-top:6px;">
-    <div class="set-row" onclick="loadAll()">
+    <div class="set-row" onclick="hardReload()">
       <div class="set-ic">🔄</div>
       <div class="set-body"><div class="set-name">I-refresh ang Data</div><div class="set-desc">I-load ulit lahat mula sa Sheets</div></div>
       <div class="set-ch">›</div>
@@ -1386,6 +1386,18 @@ function loadDataCache(){
     if(!raw) return null;
     return JSON.parse(raw);
   }catch(e){ return null; }
+}
+
+async function hardReload(){
+  // Clear cache so loadAll fetches fresh data
+  try{ localStorage.removeItem(CACHE_KEY); }catch(e){}
+  // Visual feedback
+  setConnStatus('checking');
+  const supEl = document.getElementById('sup-scroll');
+  if(supEl) supEl.innerHTML = '<div style="padding:16px;color:var(--ink3);font-size:13px;">🔄 Naglo-load...</div>';
+  toast('Nag-re-refresh...', '');
+  await loadAll();
+  toast('✅ Na-refresh na ang data!', 'ok');
 }
 
 async function loadAll(){
