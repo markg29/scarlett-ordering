@@ -1061,75 +1061,191 @@ function startQuickMode(){
   }
 }
 function qmRender(){
+  const QM_PAGE = 5; // items per page
+  // qmIndex now = page start index (multiple of QM_PAGE)
   if(qmIndex>=qmItems.length){
-    // All items reviewed
     const ov2=document.getElementById('qm-overlay');
     if(cart.length>0){
-      if(ov2){ ov2.style.display='none'; ov2.dataset.fromReview='done'; }
-      saveCartState();
-      goToReview();
+      if(ov2){ov2.style.display='none';ov2.dataset.fromReview='done';}
+      saveCartState();goToReview();
     }else{
       if(ov2) ov2.style.display='none';
-      renderItems();
-      updateCheckProgress();
+      renderItems();updateCheckProgress();
       toast('Walang naorder. Puwede kang bumalik para mag-add ng items.','warn');
     }
     return;
   }
 
-  const item=qmItems[qmIndex];
-  const inCart=cart.find(c=>c.itemId===item.id);
-  const isSkipped=skippedItems.has(item.id);
-  qmCurrentQty=inCart?inCart.qty:0;
-
-  // Show back button only if not on first item
   const backBtn=document.getElementById('qm-back-btn');
   if(backBtn) backBtn.style.display=qmIndex>0?'block':'none';
 
-  // Update progress
+  const pageNum=Math.floor(qmIndex/QM_PAGE)+1;
+  const totalPages=Math.ceil(qmItems.length/QM_PAGE);
   const pct=Math.round(qmIndex/qmItems.length*100);
-  document.getElementById('qm-counter').textContent=`${qmIndex+1} / ${qmItems.length}`;
+  document.getElementById('qm-counter').textContent=`Page ${pageNum} / ${totalPages}`;
   document.getElementById('qm-sup-name').textContent=activeSup.name;
   document.getElementById('qm-bar').style.width=pct+'%';
 
-  // Update qty input
-  const qtyEl=document.getElementById('qm-qty');
-  if(qtyEl){qtyEl.value=qmCurrentQty||'';qtyEl.style.borderColor=qmCurrentQty>0?'var(--ok)':'var(--line)';}
+  // Get items for this page
+  const pageItems=qmItems.slice(qmIndex, qmIndex+QM_PAGE);
 
-  // Render card
-  const freq=(allOrders.filter(o=>o.supplierId===activeSup.id&&o.itemId===item.id)).length;
-  const stockInfo=findStockByItemId(item.id);
+  // Render 5 compact cards
   document.getElementById('qm-card-wrap').innerHTML=`
-    <div style="background:var(--white);border-radius:20px;padding:20px;box-shadow:0 2px 12px rgba(0,0,0,.08);">
-      ${item.imageUrl?`<img src="${item.imageUrl}" style="width:100%;height:160px;object-fit:contain;border-radius:12px;background:var(--surface);margin-bottom:16px;" onerror="this.style.display='none'"/>`:''}
-      <div style="font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">${item.category||'Item'}</div>
-      <div style="font-size:20px;font-weight:800;line-height:1.3;margin-bottom:12px;">${item.name}</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
-        ${item.unit?`<span style="background:var(--brandbg);color:var(--brand);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;">${item.unit}</span>`:''}
-        ${item.price>0?`<span style="background:var(--okbg);color:var(--ok);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;">₱${item.price.toFixed(2)}</span>`:''}
-        ${freq>=3?`<span style="background:#e65100;color:#fff;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;">🔥 Madalas</span>`:''}
-        ${stockInfo?`<span style="background:var(--surface);color:var(--ink3);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;">📦 Stock: ${stockInfo.quantity}${stockInfo.unit?" "+stockInfo.unit:""}</span>`:''}
-        ${item.maxOrder>0?`<span style="background:var(--warnbg);color:var(--warn);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;">MAX ${item.maxOrder}</span>`:''}
-      </div>
-      ${isSkipped?'<div style="background:var(--dangerbg);color:var(--danger);border-radius:10px;padding:8px 12px;font-size:12px;font-weight:700;">✕ Naka-skip na — mag-order ulit?</div>':''}
-      ${inCart&&!isSkipped?`<div style="background:var(--okbg);color:var(--ok);border-radius:10px;padding:8px 12px;font-size:12px;font-weight:700;">✓ ${inCart.qty} ${item.unit} na nasa cart</div>`:''}
-    </div>
-    <button onclick="openBorrowModal()" style="width:100%;margin-top:12px;height:44px;border-radius:14px;border:1.5px dashed var(--brand);background:var(--brandbg);color:var(--brand);font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
-      🏪 May kulang? Kumuha sa ibang supplier
-    </button>
-    `;
-  // Show Lista button only if list mode is enabled in settings
-  const listaBtn = document.getElementById('qm-lista-btn');
-  if(listaBtn) listaBtn.style.display = isListModeEnabled() ? '' : 'none';
+    <div id="qm-page-cards" style="display:flex;flex-direction:column;gap:10px;">
+      ${pageItems.map((item,pi)=>{
+        const inCart=cart.find(c=>c.itemId===item.id);
+        const isSkipped=skippedItems.has(item.id);
+        const qty=inCart?inCart.qty:0;
+        const stockInfo=findStockByItemId(item.id);
+        const freq=(allOrders.filter(o=>o.supplierId===activeSup.id&&o.itemId===item.id)).length;
+        const globalIdx=qmIndex+pi;
+        const hasQty=qty>0;
+        const cardBg=isSkipped?'var(--surface)':hasQty?'#f0fdf4':'var(--white)';
+        const borderCol=isSkipped?'var(--line)':hasQty?'#86efac':'var(--line)';
+        return `<div id="qm-card-${globalIdx}" style="background:${cardBg};border-radius:16px;border:2px solid ${borderCol};padding:12px 14px;transition:all .15s;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            ${item.imageUrl?`<img src="${item.imageUrl}" style="width:48px;height:48px;border-radius:10px;object-fit:cover;flex-shrink:0;" onerror="this.style.display='none'"/>`:`<div style="width:48px;height:48px;border-radius:10px;background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">📦</div>`}
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:13px;font-weight:700;line-height:1.3;margin-bottom:3px;">${item.name}</div>
+              <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;">
+                ${item.price>0?`<span style="font-size:11px;font-weight:700;color:var(--ok);">₱${item.price.toFixed(2)}</span>`:''}
+                ${stockInfo!==null?`<span style="font-size:11px;color:var(--ink3);">📦${stockInfo.quantity}${item.unit?' '+item.unit:''}</span>`:''}
+                ${freq>=3?`<span style="font-size:11px;color:#e65100;">🔥</span>`:''}
+                ${isSkipped?`<span style="font-size:11px;color:var(--danger);font-weight:700;">✕ Naka-skip</span>`:''}
+              </div>
+            </div>
+            <!-- Compact stepper -->
+            <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
+              <button onclick="qmPageAdj(${globalIdx},-1)" style="width:32px;height:32px;border-radius:8px;border:1.5px solid var(--line);background:var(--surface);font-size:18px;font-weight:300;color:var(--brand);cursor:pointer;display:flex;align-items:center;justify-content:center;">−</button>
+              <input id="qm-qty-${globalIdx}" type="number" inputmode="numeric" min="0" placeholder="0"
+                value="${qty||''}"
+                style="width:44px;height:32px;text-align:center;font-size:14px;font-weight:800;border:1.5px solid ${hasQty?'var(--ok)':'var(--line)'};border-radius:8px;padding:0;font-family:inherit;color:var(--ink);background:var(--white);"
+                oninput="qmPageQtyInput(${globalIdx},this.value)"/>
+              <button onclick="qmPageAdj(${globalIdx},1)" style="width:32px;height:32px;border-radius:8px;border:1.5px solid var(--line);background:var(--surface);font-size:18px;font-weight:300;color:var(--brand);cursor:pointer;display:flex;align-items:center;justify-content:center;">+</button>
+              <button id="qm-skip-${globalIdx}"
+                onmousedown="skipPageHoldStart(event,${globalIdx})" onmouseup="skipPageHoldCancel(${globalIdx})" onmouseleave="skipPageHoldCancel(${globalIdx})"
+                ontouchstart="skipPageHoldStart(event,${globalIdx})" ontouchend="skipPageHoldCancel(${globalIdx})" ontouchcancel="skipPageHoldCancel(${globalIdx})"
+                style="width:32px;height:32px;border-radius:8px;border:1.5px solid var(--danger);background:var(--white);color:var(--danger);font-size:12px;cursor:pointer;flex-shrink:0;position:relative;overflow:hidden;user-select:none;-webkit-user-select:none;">
+                <span id="qm-skip-lbl-${globalIdx}">✕</span>
+                <div id="qm-skip-fill-${globalIdx}" style="position:absolute;bottom:0;left:0;height:3px;width:0%;background:var(--danger);transition:width 0.9s linear;pointer-events:none;"></div>
+              </button>
+            </div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+
   // Update review bar
   const _rb=document.getElementById('qm-review-bar');
   const _rc=document.getElementById('qm-cart-count');
   const _pad=document.getElementById('qm-no-review-pad');
-  if(_rb){ _rb.style.display=cart.length>0?'':'none'; }
-  if(_rc){ _rc.textContent=cart.length; }
-  if(_pad){ _pad.style.display=cart.length>0?'none':''; }
+  if(_rb) _rb.style.display=cart.length>0?'':'none';
+  if(_rc) _rc.textContent=cart.length;
+  if(_pad) _pad.style.display=cart.length>0?'none':'';
 
+  // Lista button
+  const listaBtn=document.getElementById('qm-lista-btn');
+  if(listaBtn) listaBtn.style.display=isListModeEnabled()?'':'none';
 }
+
+// Per-item qty handlers for page mode
+const _pageHoldTimers={};
+
+function qmPageAdj(globalIdx, delta){
+  const item=qmItems[globalIdx];
+  if(!item) return;
+  const maxQ=item.maxOrder>0?item.maxOrder:9999;
+  const inCart=cart.find(c=>c.itemId===item.id);
+  const cur=inCart?inCart.qty:0;
+  const newQty=Math.min(Math.max(0,cur+delta),maxQ);
+  _applyPageQty(globalIdx, newQty);
+}
+
+function qmPageQtyInput(globalIdx, val){
+  const item=qmItems[globalIdx];
+  if(!item) return;
+  const maxQ=item.maxOrder>0?item.maxOrder:9999;
+  const newQty=Math.min(Math.max(0,parseInt(val)||0),maxQ);
+  _applyPageQty(globalIdx, newQty, false);
+}
+
+function _applyPageQty(globalIdx, newQty, updateInput=true){
+  const item=qmItems[globalIdx];
+  if(!item) return;
+  // Update cart
+  const cartIdx=cart.findIndex(c=>c.itemId===item.id);
+  if(newQty>0){
+    if(cartIdx>=0) cart[cartIdx].qty=newQty;
+    else cart.push({itemId:item.id,itemName:item.name,unit:item.unit,price:item.price,supplierId:item.supplierId,supplierName:activeSup.name,qty:newQty});
+    skippedItems.delete(item.id);
+  }else{
+    if(cartIdx>=0) cart.splice(cartIdx,1);
+  }
+  saveCartState(); refreshFloat();
+  // Update card UI
+  const card=document.getElementById('qm-card-'+globalIdx);
+  const inp=document.getElementById('qm-qty-'+globalIdx);
+  if(inp&&updateInput){inp.value=newQty||'';inp.style.borderColor=newQty>0?'var(--ok)':'var(--line)';}
+  if(card){
+    card.style.background=newQty>0?'#f0fdf4':'var(--white)';
+    card.style.borderColor=newQty>0?'#86efac':'var(--line)';
+  }
+  // Update review bar
+  const _rb=document.getElementById('qm-review-bar');
+  const _rc=document.getElementById('qm-cart-count');
+  const _pad=document.getElementById('qm-no-review-pad');
+  if(_rb) _rb.style.display=cart.length>0?'':'none';
+  if(_rc) _rc.textContent=cart.length;
+  if(_pad) _pad.style.display=cart.length>0?'none':'';
+}
+
+function skipPageHoldStart(e, globalIdx){
+  if(e) e.preventDefault();
+  if(_pageHoldTimers[globalIdx]) return;
+  const fill=document.getElementById('qm-skip-fill-'+globalIdx);
+  const lbl=document.getElementById('qm-skip-lbl-'+globalIdx);
+  const btn=document.getElementById('qm-skip-'+globalIdx);
+  if(fill){fill.style.transition='width 0.9s linear';fill.style.width='100%';}
+  if(lbl) lbl.textContent='…';
+  if(btn) btn.style.background='var(--dangerbg)';
+  _pageHoldTimers[globalIdx]=setTimeout(()=>{
+    delete _pageHoldTimers[globalIdx];
+    skipPageHoldCancel(globalIdx);
+    _doPageSkip(globalIdx);
+  },900);
+}
+
+function skipPageHoldCancel(globalIdx){
+  if(_pageHoldTimers[globalIdx]){clearTimeout(_pageHoldTimers[globalIdx]);delete _pageHoldTimers[globalIdx];}
+  const fill=document.getElementById('qm-skip-fill-'+globalIdx);
+  const lbl=document.getElementById('qm-skip-lbl-'+globalIdx);
+  const btn=document.getElementById('qm-skip-'+globalIdx);
+  if(fill){fill.style.transition='width 0.15s linear';fill.style.width='0%';}
+  if(lbl) lbl.textContent='✕';
+  if(btn) btn.style.background='var(--white)';
+}
+
+function _doPageSkip(globalIdx){
+  const item=qmItems[globalIdx];
+  if(!item) return;
+  const cartIdx=cart.findIndex(c=>c.itemId===item.id);
+  if(cartIdx>=0) cart.splice(cartIdx,1);
+  skippedItems.add(item.id);
+  saveCartState(); refreshFloat();
+  // Flash card red
+  const card=document.getElementById('qm-card-'+globalIdx);
+  if(card){
+    card.style.background='#fee2e2';
+    card.style.borderColor='var(--danger)';
+    setTimeout(()=>{
+      if(card){card.style.background='var(--surface)';card.style.borderColor='var(--line)';}
+      const inp=document.getElementById('qm-qty-'+globalIdx);
+      if(inp){inp.value='';inp.style.borderColor='var(--line)';}
+    },400);
+  }
+}
+
+
 function qmAdj(delta){
   const item=qmItems[qmIndex];
   if(!item) return;
@@ -1149,39 +1265,11 @@ function qmQtyInput(val){
 }
 
 function qmNext(){
-  const item=qmItems[qmIndex];
-
-  // Read actual input value — mobile may not have fired oninput yet
-  const qtyEl=document.getElementById('qm-qty');
-  if(qtyEl && qtyEl.value!=='') qmCurrentQty=Math.max(0,parseFloat(qtyEl.value)||0);
-
-  // If qty is 0 — show skip confirmation (same on all items including last)
-  if(qmCurrentQty<=0){
-    // Show skip confirmation
-    const existing=document.getElementById('qm-zero-confirm');
-    if(existing)existing.remove();
-    document.getElementById('qm-card-wrap').innerHTML+=`
-      <div id="qm-zero-confirm" style="margin-top:10px;background:var(--warnbg);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;">
-        <div style="font-size:13px;font-weight:700;color:var(--warn);">⚠️ Wala kang nilagay na qty. I-skip ba ito?</div>
-        <div style="display:flex;gap:8px;">
-          <button onclick="qmConfirmSkip()" style="flex:1;height:40px;border-radius:10px;border:none;background:var(--danger);color:#fff;font-size:13px;font-weight:700;cursor:pointer;">✕ Oo, I-skip</button>
-          <button onclick="qmDismissConfirm()" style="flex:1;height:40px;border-radius:10px;border:2px solid var(--line);background:var(--white);color:var(--ink2);font-size:13px;font-weight:700;cursor:pointer;">↩ Mag-lagay ng Qty</button>
-        </div>
-      </div>`;
-    return;
-  }
-
-  // Has qty — add to cart
-  skippedItems.delete(item.id);
-  const existing=cart.findIndex(c=>c.itemId===item.id);
-  const entry={itemId:item.id,name:item.name,unit:item.unit,price:item.price,qty:qmCurrentQty,notes:''};
-  if(existing>=0)cart[existing]=entry;
-  else cart.push(entry);
-  saveCartState();
-  refreshFloat();
-  qmIndex++;
+  const QM_PAGE=5;
+  // Advance by one page
+  qmIndex=Math.min(qmIndex+QM_PAGE, qmItems.length);
   qmCurrentQty=0;
-  qmRender(); // if last item, qmRender -> qmIndex>=length -> goToReview
+  qmRender();
 }
 
 function qmConfirmSkip(){
@@ -1208,18 +1296,10 @@ function qmGoReview(){
 }
 
 function qmBack(){
+  const QM_PAGE=5;
   if(qmIndex<=0) return;
-  qmIndex--;
-  const item=qmItems[qmIndex];
-  // Restore previous state - remove from cart or unskip
-  const prevInCart=cart.findIndex(c=>c.itemId===item.id);
-  if(prevInCart>=0){
-    qmCurrentQty=cart[prevInCart].qty;
-  }else if(skippedItems.has(item.id)){
-    qmCurrentQty=0;
-  }else{
-    qmCurrentQty=0;
-  }
+  qmIndex=Math.max(0, qmIndex-QM_PAGE);
+  qmCurrentQty=0;
   qmRender();
 }
 
@@ -4191,27 +4271,9 @@ function showUpdateToast(){
   <!-- Controls -->
   <div style="background:var(--white);border-top:1px solid var(--line);flex-shrink:0;">
     <div style="padding:10px 16px 0;">
-      <!-- Stepper row -->
-      <div style="display:flex;gap:10px;margin-bottom:8px;">
-        <button id="qm-minus" onclick="qmAdj(-1)" style="width:60px;height:60px;border-radius:16px;border:2px solid var(--line);background:var(--surface);font-size:28px;font-weight:300;color:var(--brand);cursor:pointer;">−</button>
-        <input id="qm-qty" type="number" inputmode="numeric" min="0" placeholder="0"
-          style="flex:1;text-align:center;font-size:32px;font-weight:800;border:2px solid var(--line);border-radius:16px;padding:6px;font-family:inherit;color:var(--ink);background:var(--white);min-width:0;"
-          oninput="qmQtyInput(this.value)"/>
-        <button id="qm-plus" onclick="qmAdj(1)" style="width:60px;height:60px;border-radius:16px;border:2px solid var(--line);background:var(--surface);font-size:28px;font-weight:300;color:var(--brand);cursor:pointer;">+</button>
-      </div>
-      <!-- Susunod — full width -->
+      <!-- Next page button -->
       <div style="margin-bottom:8px;">
-        <button id="qm-next-btn" onclick="qmNext()" style="width:100%;height:52px;border-radius:14px;border:none;background:var(--brand);color:#fff;font-size:16px;font-weight:700;cursor:pointer;">Susunod →</button>
-      </div>
-      <!-- Skip — full width, hold to skip -->
-      <div style="margin-bottom:8px;">
-        <button id="qm-skip-btn"
-          onmousedown="skipHoldStart()" onmouseup="skipHoldCancel()" onmouseleave="skipHoldCancel()"
-          ontouchstart="skipHoldStart(event)" ontouchend="skipHoldCancel()" ontouchcancel="skipHoldCancel()"
-          style="width:100%;height:44px;border-radius:14px;border:2px solid var(--danger);background:var(--white);color:var(--danger);font-size:13px;font-weight:700;cursor:pointer;position:relative;overflow:hidden;user-select:none;-webkit-user-select:none;">
-          <span id="qm-skip-label">✕ Wala — I-skip (hold)</span>
-          <div id="qm-skip-fill" style="position:absolute;left:0;top:0;height:4px;width:0%;background:var(--danger);transition:width 0.9s linear;pointer-events:none;border-radius:4px 4px 0 0;"></div>
-        </button>
+        <button id="qm-next-btn" onclick="qmNext()" style="width:100%;height:52px;border-radius:14px;border:none;background:var(--brand);color:#fff;font-size:16px;font-weight:700;cursor:pointer;">Susunod na 5 →</button>
       </div>
     </div>
     <div id="qm-review-bar" style="display:none;padding:0 16px 8px;">
