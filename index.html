@@ -989,11 +989,10 @@ function findStockByItemId(orderkoItemId){
     });
     return found ? {quantity:total, minStockQty:minStock} : null;
   }
-  // No link — name-based match only when no link is configured
+  // No link — exact name match only (strict, no normalization)
   const item=allItems?allItems.find(i=>i.id===orderkoItemId):null;
   if(!item) return null;
-  const target=item.name.trim().toLowerCase();
-  const g=inventoryGoods.find(g=>g.name.trim().toLowerCase()===target);
+  const g=inventoryGoods.find(g=>g.name===item.name);
   return g||null;
 }
 
