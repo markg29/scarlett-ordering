@@ -990,21 +990,48 @@ function findStockByItemId(orderkoItemId){
   if(!inventoryGoods.length) return null;
   const linkedIds = orderkoItemLinks[orderkoItemId];
   if(linkedIds && linkedIds.length){
-    // Sum up stock from all linked Scarlett goods
-    let total = 0, minStock = 0, found = false;
+    // Use linked Scarlett IDs only — never fallback to name match when link exists
+    let total=0, minStock=0, found=false;
     linkedIds.forEach(sid=>{
-      const g = inventoryGoods.find(g=>g.id===sid);
+      const g=inventoryGoods.find(g=>g.id===sid);
       if(g){ total+=g.quantity; minStock+=g.minStockQty; found=true; }
     });
-    if(found) return {quantity:total, minStockQty:minStock};
+    return found ? {quantity:total, minStockQty:minStock} : null;
   }
-  // Fallback: name-based match (old behavior)
-  const item = allItems ? allItems.find(i=>i.id===orderkoItemId) : null;
+  // No link — name-based match only when no link is configured
+  const item=allItems?allItems.find(i=>i.id===orderkoItemId):null;
   if(!item) return null;
-  const target = item.name.trim().toLowerCase();
-  const g = inventoryGoods.find(g=>g.name.trim().toLowerCase()===target);
-  return g || null;
+  const target=item.name.trim().toLowerCase();
+  const g=inventoryGoods.find(g=>g.name.trim().toLowerCase()===target);
+  return g||null;
 }
+
+// ── Background inventory refresh ─────────────────────────────
+async function silentRefreshInventory(){
+  try{
+    const dInv=await apiGet({action:'getInventory'});
+    if(dInv&&dInv.goods){
+      inventoryGoods=(dInv.goods||[]).map(r=>({
+        id:String(r[0]||''),name:String(r[1]||''),
+        quantity:parseFloat(r[4])||0,minStockQty:parseFloat(r[5])||0,
+        unit:String(r[7]||'')
+      })).filter(g=>g.id&&g.name);
+      try{
+        const c=JSON.parse(localStorage.getItem(CACHE_KEY)||'{}');
+        c.inventory=dInv.goods; c.invTs=Date.now();
+        localStorage.setItem(CACHE_KEY,JSON.stringify(c));
+      }catch(e){}
+      if(document.getElementById('pg-items')?.classList.contains('on')) renderItems();
+    }
+  }catch(e){}
+}
+
+// Refresh inventory every 3 minutes and on visibility change
+setInterval(silentRefreshInventory, 3*60*1000);
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible') silentRefreshInventory();
+});
+
 
 // Keep old findStockByName for backward compat
 function findStockByName(itemName){
