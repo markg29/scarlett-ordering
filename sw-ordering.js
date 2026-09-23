@@ -1,5 +1,5 @@
 // sw-ordering.js — OrderKo Service Worker
-const CACHE = 'orderko-v4';
+const CACHE = 'orderko-v20260923';
 const API = 'https://script.google.com/macros/s/AKfycbzrKmEjPc8Xj6PRqnzkbukTk7rPoJrOgXKS1NZNT-_8oheJn_VxuxesJXpam2KrZLtF/exec';
 
 self.addEventListener('install', e => {
