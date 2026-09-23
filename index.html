@@ -919,7 +919,7 @@ async function apiGet(p,_retry=0){
 }
 async function apiPost(b,_retry=0){
   const controller=new AbortController();
-  const tid=setTimeout(()=>controller.abort(),12000);
+  const tid=setTimeout(()=>controller.abort(),20000); // longer timeout, NO retry for mutations
   try{
     const r=await fetch(API,{
       method:'POST',headers:{'Content-Type':'text/plain'},
@@ -928,7 +928,10 @@ async function apiPost(b,_retry=0){
     });
     clearTimeout(tid);
     if(!r.ok){
-      if(_retry<1){
+      // For write operations (saveOrder, addMovement etc), don't retry — risk of duplicate
+      const isMutation = ['saveOrder','addOrder','batchAddMovement','addMovement',
+                          'saveItemLinks','addItem','editItem','deleteItem'].includes(b.action);
+      if(!isMutation && _retry<1){
         await new Promise(res=>setTimeout(res,500));
         return apiPost(b,_retry+1);
       }
@@ -940,10 +943,14 @@ async function apiPost(b,_retry=0){
   }catch(e){
     clearTimeout(tid);
     if(e.name==='AbortError'){
+      // For mutations — never retry, warn user instead
+      const isMutation = ['saveOrder','addOrder','batchAddMovement','addMovement',
+                          'saveItemLinks','addItem','editItem','deleteItem'].includes(b.action);
+      if(isMutation) throw new Error('Timeout — baka nai-save na. I-refresh muna bago ulit mag-try.');
       if(_retry<1) return apiPost(b,_retry+1);
-      throw new Error('Timeout — baka nai-save na. I-refresh muna bago ulit mag-try.');
+      throw new Error('Timeout — pakicheck ang koneksyon.');
     }
-    if(_retry<1&&(e.name==='TypeError'||String(e).includes('fetch'))){
+    if(_retry<1&&!['saveOrder','addOrder'].includes(b.action)&&(e.name==='TypeError'||String(e).includes('fetch'))){
       await new Promise(res=>setTimeout(res,500));
       return apiPost(b,_retry+1);
     }
