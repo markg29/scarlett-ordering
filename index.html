@@ -1061,7 +1061,7 @@ function startQuickMode(){
   }
 }
 function qmRender(){
-  const QM_PAGE=5;
+  const QM_PAGE=4;
   if(qmIndex>=qmItems.length){
     const ov2=document.getElementById('qm-overlay');
     if(cart.length>0){
@@ -1087,7 +1087,7 @@ function qmRender(){
 
   const pageItems=qmItems.slice(qmIndex, qmIndex+QM_PAGE);
 
-  document.getElementById('qm-card-wrap').innerHTML=`<div style="display:flex;flex-direction:column;gap:6px;height:100%;">
+  document.getElementById('qm-card-wrap').innerHTML=`<div style="display:flex;flex-direction:column;gap:8px;height:100%;">
     ${pageItems.map((item,pi)=>{
       const globalIdx=qmIndex+pi;
       const inCart=cart.find(c=>c.itemId===item.id);
@@ -1096,41 +1096,49 @@ function qmRender(){
       const stockInfo=findStockByItemId(item.id);
       const freq=(allOrders.filter(o=>o.supplierId===activeSup.id&&o.itemId===item.id)).length;
       const hasQty=qty>0;
-      const borderCol=hasQty?'#86efac':'var(--line)';
-      const bgCol=hasQty?'#f0fdf4':isSkipped?'var(--surface)':'var(--white)';
 
-      return `<div id="qm-card-${globalIdx}" style="background:${bgCol};border-radius:16px;border:2px solid ${borderCol};padding:10px 12px;transition:all .15s;flex:1;display:flex;flex-direction:column;justify-content:center;min-height:0;">
+      return `<div id="qm-card-${globalIdx}" style="
+        background:${hasQty?'#f0fdf4':isSkipped?'var(--surface)':'var(--white)'};
+        border-radius:16px;
+        border:2px solid ${hasQty?'#86efac':'var(--line)'};
+        padding:12px 14px;
+        flex:1;
+        display:flex;
+        flex-direction:column;
+        justify-content:space-between;
+        transition:all .15s;
+        min-height:0;
+        overflow:hidden;">
 
-        <div style="font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">${item.category||'Item'}</div>
-        <div style="font-size:14px;font-weight:800;line-height:1.3;margin-bottom:6px;">${item.name}</div>
-
-        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px;">
-          ${item.unit?`<span style="background:var(--brandbg);color:var(--brand);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;">${item.unit}</span>`:''}
-          ${item.price>0?`<span style="background:var(--okbg);color:var(--ok);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;">₱${item.price.toFixed(2)}</span>`:''}
-          ${stockInfo!==null?`<span style="background:var(--surface);color:var(--ink2);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;">📦 Stock: ${stockInfo.quantity}${stockInfo.unit?' '+stockInfo.unit:''}</span>`:''}
-          ${freq>=3?`<span style="background:#e65100;color:#fff;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;">🔥 Madalas</span>`:''}
-          ${item.maxOrder>0?`<span style="background:var(--warnbg);color:var(--warn);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;">MAX ${item.maxOrder}</span>`:''}
+        <!-- Top: name + badges -->
+        <div>
+          <div style="font-size:13px;font-weight:800;line-height:1.3;margin-bottom:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${item.name}</div>
+          <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;">
+            ${item.unit?`<span style="background:var(--brandbg);color:var(--brand);border-radius:999px;padding:2px 9px;font-size:11px;font-weight:700;">${item.unit}</span>`:''}
+            ${item.price>0?`<span style="background:var(--okbg);color:var(--ok);border-radius:999px;padding:2px 9px;font-size:11px;font-weight:700;">₱${item.price.toFixed(2)}</span>`:''}
+            ${stockInfo!==null?`<span style="background:var(--surface);color:var(--ink2);border-radius:999px;padding:2px 9px;font-size:11px;font-weight:700;">📦 Stock: ${stockInfo.quantity}${stockInfo.unit?' '+stockInfo.unit:''}</span>`:''}
+            ${freq>=3?`<span style="background:#e65100;color:#fff;border-radius:999px;padding:2px 9px;font-size:11px;font-weight:700;">🔥</span>`:''}
+            ${hasQty?`<span style="background:var(--okbg);color:var(--ok);border-radius:999px;padding:2px 9px;font-size:11px;font-weight:700;">✓ ${qty} nasa cart</span>`:isSkipped?`<span style="background:var(--dangerbg);color:var(--danger);border-radius:999px;padding:2px 9px;font-size:11px;font-weight:700;">✕ naka-skip</span>`:''}
+          </div>
         </div>
 
-        ${isSkipped&&!hasQty?`<div style="background:var(--dangerbg);color:var(--danger);border-radius:10px;padding:8px 12px;font-size:12px;font-weight:700;margin-bottom:10px;">✕ Naka-skip na — mag-order ulit?</div>`:''}
-        ${hasQty?`<div style="background:var(--okbg);color:var(--ok);border-radius:10px;padding:8px 12px;font-size:12px;font-weight:700;margin-bottom:10px;">✓ ${qty} ${item.unit||''} nasa cart na</div>`:''}
-
-        <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
-          <button onclick="qmPageAdj(${globalIdx},-1)" style="width:48px;height:48px;border-radius:12px;border:2px solid var(--line);background:var(--surface);font-size:24px;font-weight:300;color:var(--brand);cursor:pointer;flex-shrink:0;">−</button>
+        <!-- Bottom: stepper + skip -->
+        <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
+          <button onclick="qmPageAdj(${globalIdx},-1)" style="width:52px;height:52px;border-radius:14px;border:2px solid var(--line);background:var(--surface);font-size:26px;font-weight:300;color:var(--brand);cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;">−</button>
           <input id="qm-qty-${globalIdx}" type="number" inputmode="numeric" min="0" placeholder="0"
             value="${qty||''}"
-            style="flex:1;text-align:center;font-size:26px;font-weight:800;border:2px solid ${hasQty?'var(--ok)':'var(--line)'};border-radius:12px;padding:4px;font-family:inherit;color:var(--ink);background:var(--white);min-width:0;height:48px;"
+            style="flex:1;text-align:center;font-size:26px;font-weight:800;border:2px solid ${hasQty?'var(--ok)':'var(--line)'};border-radius:14px;height:52px;padding:0;font-family:inherit;color:var(--ink);background:var(--white);min-width:0;"
             oninput="qmPageQtyInput(${globalIdx},this.value)"/>
-          <button onclick="qmPageAdj(${globalIdx},1)" style="width:48px;height:48px;border-radius:12px;border:2px solid var(--line);background:var(--surface);font-size:24px;font-weight:300;color:var(--brand);cursor:pointer;flex-shrink:0;">+</button>
+          <button onclick="qmPageAdj(${globalIdx},1)" style="width:52px;height:52px;border-radius:14px;border:2px solid var(--line);background:var(--surface);font-size:26px;font-weight:300;color:var(--brand);cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;">+</button>
+          <button id="qm-skip-${globalIdx}"
+            onmousedown="skipPageHoldStart(event,${globalIdx})" onmouseup="skipPageHoldCancel(${globalIdx})" onmouseleave="skipPageHoldCancel(${globalIdx})"
+            ontouchstart="skipPageHoldStart(event,${globalIdx})" ontouchend="skipPageHoldCancel(${globalIdx})" ontouchcancel="skipPageHoldCancel(${globalIdx})"
+            style="width:52px;height:52px;border-radius:14px;border:2px solid var(--danger);background:var(--white);color:var(--danger);font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0;position:relative;overflow:hidden;user-select:none;-webkit-user-select:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;">
+            <span style="font-size:15px;line-height:1;">✕</span>
+            <span id="qm-skip-lbl-${globalIdx}" style="font-size:9px;line-height:1;">HOLD</span>
+            <div id="qm-skip-fill-${globalIdx}" style="position:absolute;bottom:0;left:0;height:3px;width:0%;background:var(--danger);transition:width 0.9s linear;pointer-events:none;"></div>
+          </button>
         </div>
-
-        <button id="qm-skip-${globalIdx}"
-          onmousedown="skipPageHoldStart(event,${globalIdx})" onmouseup="skipPageHoldCancel(${globalIdx})" onmouseleave="skipPageHoldCancel(${globalIdx})"
-          ontouchstart="skipPageHoldStart(event,${globalIdx})" ontouchend="skipPageHoldCancel(${globalIdx})" ontouchcancel="skipPageHoldCancel(${globalIdx})"
-          style="width:100%;height:44px;border-radius:14px;border:2px solid var(--danger);background:var(--white);color:var(--danger);font-size:13px;font-weight:700;cursor:pointer;position:relative;overflow:hidden;user-select:none;-webkit-user-select:none;">
-          <span id="qm-skip-lbl-${globalIdx}">✕ Wala — I-skip (hold)</span>
-          <div id="qm-skip-fill-${globalIdx}" style="position:absolute;left:0;top:0;height:4px;width:0%;background:var(--danger);transition:width 0.9s linear;pointer-events:none;border-radius:4px 4px 0 0;"></div>
-        </button>
       </div>`;
     }).join('')}
   </div>`;
@@ -1294,7 +1302,7 @@ function qmGoReview(){
 }
 
 function qmBack(){
-  const QM_PAGE=5;
+  const QM_PAGE=4;
   if(qmIndex<=0) return;
   qmIndex=Math.max(0, qmIndex-QM_PAGE);
   qmCurrentQty=0;
@@ -4265,13 +4273,13 @@ function showUpdateToast(){
     </div>
   </div>
   <!-- Card area -->
-  <div id="qm-card-wrap" style="flex:1;overflow:hidden;padding:8px 16px 4px;min-height:0;display:flex;flex-direction:column;"></div>
+  <div id="qm-card-wrap" style="flex:1;overflow:hidden;padding:8px 16px 4px;min-height:0;"></div>
   <!-- Controls -->
   <div style="background:var(--white);border-top:1px solid var(--line);flex-shrink:0;">
     <div style="padding:10px 16px 0;">
       <!-- Next page button -->
       <div style="margin-bottom:8px;">
-        <button id="qm-next-btn" onclick="qmNext()" style="width:100%;height:52px;border-radius:14px;border:none;background:var(--brand);color:#fff;font-size:16px;font-weight:700;cursor:pointer;">Susunod na 5 →</button>
+        <button id="qm-next-btn" onclick="qmNext()" style="width:100%;height:52px;border-radius:14px;border:none;background:var(--brand);color:#fff;font-size:16px;font-weight:700;cursor:pointer;">Susunod na 4 →</button>
       </div>
     </div>
     <div id="qm-review-bar" style="display:none;padding:0 16px 8px;">
