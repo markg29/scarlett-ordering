@@ -1098,9 +1098,9 @@ function qmRender(){
       const hasQty=qty>0;
 
       return `<div id="qm-card-${globalIdx}" style="
-        background:${hasQty?'#f0fdf4':isSkipped?'var(--surface)':'var(--white)'};
+        background:${hasQty?'#f0fdf4':isSkipped?'#fee2e2':'var(--white)'};
         border-radius:16px;
-        border:2px solid ${hasQty?'#86efac':'var(--line)'};
+        border:2px solid ${hasQty?'#86efac':isSkipped?'#fca5a5':'var(--line)'};
         padding:12px 14px;
         flex:1;
         display:flex;
@@ -1133,7 +1133,7 @@ function qmRender(){
           <button id="qm-skip-${globalIdx}"
             onmousedown="skipPageHoldStart(event,${globalIdx})" onmouseup="skipPageHoldCancel(${globalIdx})" onmouseleave="skipPageHoldCancel(${globalIdx})"
             ontouchstart="skipPageHoldStart(event,${globalIdx})" ontouchend="skipPageHoldCancel(${globalIdx})" ontouchcancel="skipPageHoldCancel(${globalIdx})"
-            style="width:64px;height:52px;border-radius:14px;border:2px solid var(--danger);background:var(--dangerbg);color:var(--danger);cursor:pointer;flex-shrink:0;position:relative;overflow:hidden;user-select:none;-webkit-user-select:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;">
+            style="width:52px;height:52px;border-radius:14px;border:2px solid var(--danger);background:var(--dangerbg);color:var(--danger);cursor:pointer;flex-shrink:0;position:relative;overflow:hidden;user-select:none;-webkit-user-select:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;">
             <span style="font-size:20px;line-height:1;">✕</span>
             <span id="qm-skip-lbl-${globalIdx}" style="font-size:10px;font-weight:800;line-height:1;letter-spacing:.3px;">HOLD</span>
             <div id="qm-skip-fill-${globalIdx}" style="position:absolute;bottom:0;left:0;height:4px;width:0%;background:var(--danger);transition:width 0.9s linear;pointer-events:none;"></div>
@@ -1240,21 +1240,12 @@ function _doPageSkip(globalIdx){
   saveCartState(); refreshFloat();
   // Flash card red
   const card=document.getElementById('qm-card-'+globalIdx);
+  // Keep card red permanently when skipped
   if(card){
-    // Flash red
     card.style.background='#fee2e2';
-    card.style.borderColor='var(--danger)';
-    setTimeout(()=>{
-      if(card){card.style.background='var(--surface)';card.style.borderColor='var(--line)';}
-    },500);
-    // Clear qty input separately — but only if still 0 in cart
-    setTimeout(()=>{
-      const stillSkipped=skippedItems.has(item.id)&&!cart.find(c=>c.itemId===item.id);
-      if(stillSkipped){
-        const inp=document.getElementById('qm-qty-'+globalIdx);
-        if(inp){inp.value='';inp.style.borderColor='var(--line)';}
-      }
-    },510);
+    card.style.borderColor='#fca5a5';
+    const inp=document.getElementById('qm-qty-'+globalIdx);
+    if(inp){inp.value='';inp.style.borderColor='var(--line)';}
   }
 }
 
@@ -1292,16 +1283,31 @@ function qmNext(){
       }
     }
   });
-  // Check if all items on this page are untouched (0 qty, not skipped)
+  // Check if any item is untouched — highlight them, block advance
   const pageItems=qmItems.slice(qmIndex, qmIndex+QM_PAGE);
-  const allUntouched=pageItems.every(item=>
-    !cart.find(c=>c.itemId===item.id) && !skippedItems.has(item.id)
-  );
-  if(allUntouched && pageItems.length>0){
-    if(!confirm(`Walang nailagay na qty sa ${pageItems.length} items na ito. Itutuloy ba?`)) return;
-    // Mark all as skipped
-    pageItems.forEach(item=>skippedItems.add(item.id));
-    saveCartState();
+  const untouched=pageItems.filter((item,pi)=>{
+    const globalIdx=qmIndex+pi;
+    const inp=document.getElementById('qm-qty-'+globalIdx);
+    const typedQty=inp&&inp.value!==''?parseInt(inp.value)||0:0;
+    return typedQty===0 && !cart.find(c=>c.itemId===item.id) && !skippedItems.has(item.id);
+  });
+  if(untouched.length>0){
+    // Highlight untouched cards with orange warning
+    untouched.forEach(item=>{
+      const pi=pageItems.indexOf(item);
+      const globalIdx=qmIndex+pi;
+      const card=document.getElementById('qm-card-'+globalIdx);
+      if(card){
+        card.style.background='#fff7ed';
+        card.style.borderColor='#f97316';
+        // Shake animation
+        card.style.transform='translateX(-4px)';
+        setTimeout(()=>{card.style.transform='translateX(4px)';},80);
+        setTimeout(()=>{card.style.transform='';},160);
+      }
+    });
+    toast(`${untouched.length} item pa ang hindi nacheck — mag-lagay ng qty o i-skip (hold)`, 'warn');
+    return; // block advance
   }
   qmIndex=Math.min(qmIndex+QM_PAGE, qmItems.length);
   qmCurrentQty=0;
