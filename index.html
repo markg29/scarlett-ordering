@@ -1017,7 +1017,7 @@ async function silentRefreshInventory(){
 }
 
 // Refresh inventory every 3 minutes and on visibility change
-setInterval(silentRefreshInventory, 3*60*1000);
+setInterval(silentRefreshInventory, 5*60*1000);
 document.addEventListener('visibilitychange',()=>{
   if(document.visibilityState==='visible') silentRefreshInventory();
 });
@@ -4215,7 +4215,7 @@ async function silentRefresh(){
   finally{ _silentRefreshing = false; }
 }
 // Refresh every 30 seconds silently
-setInterval(silentRefresh, 60000); // 60s interval - enough for most use cases
+// silentRefresh interval removed — causes unnecessary reloads // 60s interval - enough for most use cases
 
 // ════════════════════════════════════════
 // BOOT
