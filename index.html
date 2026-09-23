@@ -1127,9 +1127,10 @@ function qmRender(){
           <button onclick="qmPageAdj(${globalIdx},-1)" style="width:52px;height:52px;border-radius:14px;border:2px solid var(--line);background:var(--surface);font-size:26px;font-weight:300;color:var(--brand);cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;">−</button>
           <input id="qm-qty-${globalIdx}" type="number" inputmode="numeric" min="0" placeholder="0"
             value="${qty||''}"
-            style="width:72px;text-align:center;font-size:22px;font-weight:800;border:2px solid ${hasQty?'var(--ok)':'var(--line)'};border-radius:14px;height:52px;padding:0;font-family:inherit;color:var(--ink);background:var(--white);flex-shrink:0;"
+            style="width:72px;text-align:center;font-size:22px;font-weight:800;border:2px solid ${hasQty?'var(--ok)':'var(--line)'};border-radius:14px;height:52px;padding:0;font-family:inherit;color:var(--ink);background:var(--white);flex-shrink:0;${isSkipped&&!hasQty?'display:none;':''}"
             oninput="qmPageQtyInput(${globalIdx},this.value)"/>
-          <button onclick="qmPageAdj(${globalIdx},1)" style="width:52px;height:52px;border-radius:14px;border:2px solid var(--line);background:var(--surface);font-size:26px;font-weight:300;color:var(--brand);cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;">+</button>
+          ${isSkipped&&!hasQty?`<div style="flex:1;height:52px;border-radius:14px;background:#fee2e2;border:2px solid #fca5a5;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--danger);">SKIPPED</div>`:''}
+          <button onclick="qmPageAdj(${globalIdx},1)" style="width:52px;height:52px;border-radius:14px;border:2px solid var(--line);background:var(--surface);font-size:26px;font-weight:300;color:var(--brand);cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;${isSkipped&&!hasQty?'display:none !important;opacity:0;pointer-events:none;':''}">+</button>
           ${isSkipped
             ? `<button onclick="qmUndoSkip(${globalIdx})" style="flex:1;height:52px;border-radius:14px;border:2px solid var(--danger);background:#fee2e2;color:var(--danger);font-size:12px;font-weight:800;cursor:pointer;">↩ Undo Skip</button>`
             : `<button id="qm-skip-${globalIdx}"
@@ -1142,11 +1143,11 @@ function qmRender(){
               </button>`
           }
         </div>
-        <button onclick="openBorrowModal()" style="width:100%;margin-top:8px;height:36px;border-radius:12px;border:1.5px dashed var(--brand);background:var(--brandbg);color:var(--brand);font-size:12px;font-weight:700;cursor:pointer;">
-          🏪 Kumuha sa ibang supplier
-        </button>
       </div>`;
     }).join('')}
+    <button onclick="openBorrowModal()" style="width:100%;margin-top:6px;height:44px;border-radius:14px;border:1.5px dashed var(--brand);background:var(--brandbg);color:var(--brand);font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0;">
+      🏪 May kulang? Kumuha sa ibang supplier
+    </button>
   </div>`;
 
   const _rb=document.getElementById('qm-review-bar');
@@ -1268,15 +1269,8 @@ function _doPageSkip(globalIdx){
   if(cartIdx>=0) cart.splice(cartIdx,1);
   skippedItems.add(item.id);
   saveCartState(); refreshFloat();
-  // Flash card red
-  const card=document.getElementById('qm-card-'+globalIdx);
-  // Keep card red permanently when skipped
-  if(card){
-    card.style.background='#fee2e2';
-    card.style.borderColor='#fca5a5';
-    const inp=document.getElementById('qm-qty-'+globalIdx);
-    if(inp){inp.value='';inp.style.borderColor='var(--line)';}
-  }
+  // Re-render to show undo button and red card
+  qmRender();
 }
 
 
