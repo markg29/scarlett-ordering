@@ -919,7 +919,7 @@ async function apiGet(p,_retry=0){
 }
 async function apiPost(b,_retry=0){
   const controller=new AbortController();
-  const tid=setTimeout(()=>controller.abort(),30000);
+  const tid=setTimeout(()=>controller.abort(),12000);
   try{
     const r=await fetch(API,{
       method:'POST',headers:{'Content-Type':'text/plain'},
@@ -929,7 +929,7 @@ async function apiPost(b,_retry=0){
     clearTimeout(tid);
     if(!r.ok){
       if(_retry<1){
-        await new Promise(res=>setTimeout(res,1000));
+        await new Promise(res=>setTimeout(res,500));
         return apiPost(b,_retry+1);
       }
       throw new Error(`HTTP ${r.status}`);
@@ -939,9 +939,12 @@ async function apiPost(b,_retry=0){
     return d;
   }catch(e){
     clearTimeout(tid);
-    if(e.name==='AbortError')throw new Error('Timeout — baka nai-save na. I-refresh muna bago ulit mag-try.');
+    if(e.name==='AbortError'){
+      if(_retry<1) return apiPost(b,_retry+1);
+      throw new Error('Timeout — baka nai-save na. I-refresh muna bago ulit mag-try.');
+    }
     if(_retry<1&&(e.name==='TypeError'||String(e).includes('fetch'))){
-      await new Promise(res=>setTimeout(res,1500));
+      await new Promise(res=>setTimeout(res,500));
       return apiPost(b,_retry+1);
     }
     throw e;
@@ -2033,10 +2036,13 @@ function goToReview(){
   renderReview();
   goPage('review');
   document.getElementById('float-bar').classList.add('hide');
-  // If QM was active, mark so goBack() restores it
+  // Mark QM as active so goBack() can restore it
   const qmOv=document.getElementById('qm-overlay');
-  if(qmOv && qmOv.style.display==='flex'){
-    qmOv.dataset.fromReview='mid';
+  if(qmOv){
+    // If QM was mid-session, mark 'mid'; if completed (done), keep 'done'
+    if(qmOv.dataset.fromReview!=='done'){
+      qmOv.dataset.fromReview='mid';
+    }
     qmOv.style.display='none';
   }
 }
@@ -4119,7 +4125,12 @@ function goBack(){
       qmOv.dataset.fromReview='';
       goPage('items');
       qmOv.style.display='flex';
-      if(qmIndex >= qmItems.length) qmIndex = Math.max(0, qmItems.length - 1);
+      // If done (all checked), go back to last page of QM
+      if(fromReview==='done'){
+        const QM_PAGE=4;
+        qmIndex=Math.max(0, qmItems.length - QM_PAGE);
+      }
+      if(qmIndex >= qmItems.length) qmIndex=Math.max(0, qmItems.length-1);
       qmRender();
       return;
     }
