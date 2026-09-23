@@ -1451,7 +1451,8 @@ function saveCartState(){
       cart: cart,
       skippedItems: [...skippedItems],
       globalNotes: document.getElementById('global-notes')?.value || '',
-      qmIndex: qmIndex  // Save progress so Quick Mode can resume
+      qmIndex: qmIndex,
+      qmItemIds: qmItems.map(i=>i.id) // save order of items for restore
     }));
   }catch(e){}
 }
@@ -1476,6 +1477,12 @@ function restoreCartState(){
     if(state.globalNotes){
       const notesEl = document.getElementById('global-notes');
       if(notesEl) notesEl.value = state.globalNotes;
+    }
+    // Restore qmItems order if saved (needed for goBack from review)
+    if(state.qmItemIds && state.qmItemIds.length && allItems.length){
+      qmItems = state.qmItemIds
+        .map(id=>allItems.find(i=>i.id===id))
+        .filter(Boolean);
     }
     refreshFloat();
     toast('Na-restore ang cart 🛒','ok');
@@ -4122,17 +4129,21 @@ function goBack(){
     const fromReview=qmOv?.dataset.fromReview;
     // Restore QM if it was active (fromReview flag set)
     if(fromReview==='mid' || fromReview==='done'){
-      qmOv.dataset.fromReview='';
-      goPage('items');
-      qmOv.style.display='flex';
-      // If done (all checked), go back to last page of QM
-      if(fromReview==='done'){
-        const QM_PAGE=4;
-        qmIndex=Math.max(0, qmItems.length - QM_PAGE);
+      // Only restore QM if there are items to show
+      if(qmItems.length > 0){
+        qmOv.dataset.fromReview='';
+        goPage('items');
+        qmOv.style.display='flex';
+        if(fromReview==='done'){
+          const QM_PAGE=4;
+          qmIndex=Math.max(0, qmItems.length - QM_PAGE);
+        }
+        if(qmIndex >= qmItems.length) qmIndex=Math.max(0, qmItems.length-1);
+        qmRender();
+        return;
       }
-      if(qmIndex >= qmItems.length) qmIndex=Math.max(0, qmItems.length-1);
-      qmRender();
-      return;
+      // No QM session — just go to items list
+      qmOv.dataset.fromReview='';
     }
     // No flag but QM session is active — restore QM
     // Exception: 'list' means user explicitly chose list mode
